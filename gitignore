@@ -1,0 +1,7 @@
+# Never commit these
+admin.html
+SETUP_GUIDE.md
+
+# OS files
+.DS_Store
+Thumbs.db

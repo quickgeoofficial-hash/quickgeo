@@ -1,0 +1,836 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quickgeo — Admin</title>
+<link rel="manifest" href="admin-manifest.json">
+<meta name="theme-color" content="#1D9E75">
+<meta name="robots" content="noindex, nofollow">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="QG Admin">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --green: #1D9E75; --green-dark: #0F6E56; --green-light: #E1F5EE;
+  --bg: #f4f5f0; --surface: #ffffff; --surface2: #eeefe9;
+  --border: rgba(0,0,0,0.08); --border2: rgba(0,0,0,0.15);
+  --text: #1a1a18; --text2: #56564f; --text3: #96968e;
+  --red: #e24b4a; --red-light: #fff0f0; --red-border: #f7c1c1;
+  --amber: #ef9f27; --amber-light: #fff8e7; --amber-border: #fad073;
+  --shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+[data-theme="dark"] {
+  --bg: #111110; --surface: #1c1c19; --surface2: #252521;
+  --border: rgba(255,255,255,0.07); --border2: rgba(255,255,255,0.13);
+  --text: #e6e6e0; --text2: #96968e; --text3: #555550;
+  --green-light: rgba(29,158,117,0.14);
+  --red-light: rgba(226,75,74,0.12); --red-border: rgba(226,75,74,0.3);
+  --amber-light: rgba(239,159,39,0.12); --amber-border: rgba(239,159,39,0.3);
+  --shadow: 0 1px 4px rgba(0,0,0,0.3);
+}
+
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; transition: background 0.25s, color 0.25s; }
+
+/* TOPBAR */
+.topbar { background: var(--surface); border-bottom: 1px solid var(--border); box-shadow: var(--shadow); padding: 0 20px; height: 56px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
+.logo { font-family: 'Syne', sans-serif; font-size: 18px; font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 7px; }
+.logo-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); }
+.admin-badge { font-size: 11px; font-weight: 500; background: var(--amber-light); color: #856404; border: 1px solid var(--amber-border); border-radius: 20px; padding: 3px 10px; }
+[data-theme="dark"] .admin-badge { color: var(--amber); }
+.topbar-right { display: flex; align-items: center; gap: 8px; }
+.icon-btn { width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--border2); background: var(--surface2); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 14px; }
+.icon-btn:hover { background: var(--border2); }
+.user-link { font-size: 13px; color: var(--green); text-decoration: none; border: 1px solid var(--green); border-radius: 8px; padding: 5px 12px; font-weight: 500; }
+.user-link:hover { background: var(--green-light); }
+
+/* LAYOUT */
+.layout { display: grid; grid-template-columns: 1fr 350px; max-width: 1160px; margin: 0 auto; padding: 22px 18px; gap: 20px; }
+
+/* PANEL TABS */
+.main-tabs { display: flex; gap: 4px; margin-bottom: 14px; }
+.mtab { font-size: 13px; font-weight: 500; padding: 7px 15px; border-radius: 8px; border: 1px solid var(--border2); background: var(--surface); cursor: pointer; color: var(--text2); font-family: 'DM Sans', sans-serif; transition: all 0.15s; }
+.mtab.active { background: var(--green); color: #fff; border-color: var(--green); }
+
+/* CARD SHELL */
+.card { background: var(--surface); border-radius: 16px; border: 1px solid var(--border); box-shadow: var(--shadow); overflow: hidden; }
+.card-head-bar { padding: 15px 18px 0; border-bottom: 1px solid var(--border); }
+.card-head-bar h2 { font-family: 'Syne', sans-serif; font-size: 15px; font-weight: 600; margin-bottom: 13px; }
+
+/* MEDIA TABS */
+.media-tabs { display: flex; }
+.mtb { font-size: 13px; font-weight: 500; padding: 7px 15px; border: none; background: none; cursor: pointer; color: var(--text2); border-bottom: 2px solid transparent; margin-bottom: -1px; font-family: 'DM Sans', sans-serif; }
+.mtb.active { color: var(--green); border-bottom-color: var(--green); }
+
+/* FORM */
+.card-body { padding: 16px 18px; display: flex; flex-direction: column; gap: 13px; }
+.fgrp { display: flex; flex-direction: column; gap: 5px; }
+.fgrp label { font-size: 11px; font-weight: 500; color: var(--text2); text-transform: uppercase; letter-spacing: 0.05em; }
+.finput, .fselect { width: 100%; padding: 9px 11px; border: 1px solid var(--border2); border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 13px; background: var(--surface); color: var(--text); outline: none; transition: border-color 0.15s; }
+.finput:focus, .fselect:focus { border-color: var(--green); }
+.ftextarea { width: 100%; min-height: 95px; padding: 10px 11px; border: 1px solid var(--border2); border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 14px; resize: vertical; outline: none; background: var(--surface); color: var(--text); line-height: 1.65; transition: border-color 0.15s; }
+.ftextarea:focus { border-color: var(--green); }
+.char-count { font-size: 11px; color: var(--text3); text-align: right; margin-top: -8px; }
+.char-count.warn { color: var(--amber); }
+.char-count.over { color: var(--red); }
+
+/* MEDIA UPLOAD */
+.drop-zone { border: 1.5px dashed var(--border2); border-radius: 10px; padding: 20px; text-align: center; cursor: pointer; background: var(--surface2); transition: all 0.2s; }
+.drop-zone:hover, .drop-zone.drag { border-color: var(--green); background: var(--green-light); }
+.dz-icon { font-size: 24px; margin-bottom: 5px; }
+.dz-text { font-size: 13px; color: var(--text2); }
+.dz-hint { font-size: 11px; color: var(--text3); }
+#fileInput { display: none; }
+.prev-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin-top: 10px; }
+.prev-item { position: relative; border-radius: 8px; overflow: hidden; aspect-ratio: 1; background: var(--surface2); }
+.prev-item img, .prev-item video { width: 100%; height: 100%; object-fit: cover; }
+.prev-rm { position: absolute; top: 4px; right: 4px; width: 20px; height: 20px; border-radius: 50%; background: rgba(0,0,0,0.65); color: #fff; border: none; cursor: pointer; font-size: 11px; display: flex; align-items: center; justify-content: center; }
+
+/* GIF */
+.gif-row { display: flex; gap: 8px; }
+.gif-in { flex: 1; padding: 9px 11px; border: 1px solid var(--border2); border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 13px; outline: none; background: var(--surface); color: var(--text); }
+.gif-in:focus { border-color: var(--green); }
+.gif-go { padding: 9px 14px; background: var(--green); color: #fff; border: none; border-radius: 8px; font-size: 13px; cursor: pointer; font-family: 'DM Sans', sans-serif; font-weight: 500; }
+.gif-go:hover { background: var(--green-dark); }
+.gif-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 5px; margin-top: 8px; max-height: 160px; overflow-y: auto; border-radius: 8px; }
+.gif-grid img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 5px; cursor: pointer; border: 2px solid transparent; transition: border-color 0.15s; }
+.gif-grid img:hover { border-color: var(--green); }
+.gif-grid img.sel { border-color: var(--green); }
+
+/* PUBLISH BTN */
+.pub-btn { width: 100%; padding: 12px; background: var(--green); color: #fff; border: none; border-radius: 10px; font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 600; cursor: pointer; letter-spacing: 0.02em; transition: background 0.15s, transform 0.1s; }
+.pub-btn:hover { background: var(--green-dark); }
+.pub-btn:active { transform: scale(0.99); }
+.pub-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* CATEGORY MANAGER */
+.cat-mgr { background: var(--surface); border-radius: 16px; border: 1px solid var(--border); box-shadow: var(--shadow); padding: 18px; display: flex; flex-direction: column; gap: 13px; }
+.cat-mgr h2 { font-family: 'Syne', sans-serif; font-size: 15px; font-weight: 600; }
+.cat-add-row { display: flex; gap: 7px; }
+.cat-emoji-btn { width: 38px; height: 36px; border: 1px solid var(--border2); border-radius: 8px; background: var(--surface2); cursor: pointer; font-size: 17px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: border-color 0.15s; }
+.cat-emoji-btn:hover { border-color: var(--green); }
+.cat-name-in { flex: 1; padding: 8px 11px; border: 1px solid var(--border2); border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 13px; outline: none; background: var(--surface); color: var(--text); }
+.cat-name-in:focus { border-color: var(--green); }
+.cat-add-btn { padding: 8px 13px; background: var(--green); color: #fff; border: none; border-radius: 8px; font-size: 13px; font-weight: 500; cursor: pointer; font-family: 'DM Sans', sans-serif; white-space: nowrap; }
+.cat-add-btn:hover { background: var(--green-dark); }
+.emoji-picker-pop { display: flex; flex-wrap: wrap; gap: 4px; padding: 8px; background: var(--surface); border: 1px solid var(--border2); border-radius: 10px; }
+.ep-e { width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; font-size: 17px; border-radius: 6px; cursor: pointer; border: 1px solid transparent; }
+.ep-e:hover { background: var(--green-light); border-color: var(--green); }
+.cat-list { display: flex; flex-direction: column; gap: 5px; max-height: 300px; overflow-y: auto; }
+.cat-item { display: flex; align-items: center; gap: 9px; padding: 8px 11px; background: var(--surface2); border-radius: 9px; border: 1px solid var(--border); }
+.cat-item-icon { font-size: 17px; }
+.cat-item-name { flex: 1; font-size: 13px; font-weight: 500; }
+.cat-item-def { font-size: 10px; color: var(--text3); background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 1px 6px; }
+.cat-rm { font-size: 12px; color: var(--red); background: var(--red-light); border: 1px solid var(--red-border); border-radius: 6px; padding: 3px 9px; cursor: pointer; font-family: 'DM Sans', sans-serif; transition: all 0.15s; }
+
+/* ADMIN FEED RIGHT COL */
+.feed-col { display: flex; flex-direction: column; gap: 11px; max-height: calc(100vh - 105px); overflow-y: auto; padding-right: 2px; }
+.feed-col::-webkit-scrollbar { width: 4px; }
+.feed-col::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+.feed-hdr { display: flex; align-items: center; justify-content: space-between; }
+.feed-hdr h3 { font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 600; }
+.post-count { font-size: 12px; color: var(--text3); }
+
+.pcard { background: var(--surface); border-radius: 13px; border: 1px solid var(--border); overflow: hidden; box-shadow: var(--shadow); }
+.pcard-hd { padding: 10px 13px 0; display: flex; align-items: flex-start; justify-content: space-between; gap: 7px; }
+.ptag { font-size: 11px; font-weight: 500; color: var(--green-dark); background: var(--green-light); border-radius: 4px; padding: 2px 7px; }
+[data-theme="dark"] .ptag { color: #5DCAA5; }
+.ptime { font-size: 11px; color: var(--text3); white-space: nowrap; }
+.pbody { padding: 8px 13px 9px; font-size: 13px; line-height: 1.6; color: var(--text); }
+.pmedia { width: 100%; max-height: 160px; object-fit: cover; display: block; }
+.preacts { padding: 5px 13px 9px; display: flex; flex-wrap: wrap; gap: 5px; }
+.rpill { font-size: 12px; background: var(--surface2); border: 1px solid var(--border); border-radius: 20px; padding: 2px 9px; }
+.pactions { padding: 0 13px 10px; display: flex; gap: 7px; border-top: 1px solid var(--border); padding-top: 8px; margin-top: 1px; }
+.act-pin { font-size: 12px; color: var(--amber); background: var(--amber-light); border: 1px solid var(--amber-border); border-radius: 6px; padding: 4px 10px; cursor: pointer; font-family: 'DM Sans', sans-serif; }
+.act-del { font-size: 12px; color: var(--red); background: var(--red-light); border: 1px solid var(--red-border); border-radius: 6px; padding: 4px 10px; cursor: pointer; font-family: 'DM Sans', sans-serif; transition: all 0.15s; }
+.ppin-lbl { font-size: 11px; color: var(--amber); font-weight: 500; padding: 5px 13px 0; }
+.empty-msg { text-align: center; padding: 36px 16px; color: var(--text3); font-size: 13px; }
+
+/* TOAST */
+.toast { position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%); background: var(--text); color: var(--surface); font-size: 13px; font-weight: 500; padding: 9px 18px; border-radius: 20px; z-index: 999; animation: fadeInOut 2.5s ease forwards; pointer-events: none; }
+@keyframes fadeInOut { 0%{opacity:0;transform:translateX(-50%) translateY(8px)} 15%{opacity:1;transform:translateX(-50%) translateY(0)} 75%{opacity:1} 100%{opacity:0} }
+
+/* PWA BANNER */
+.pwa-banner { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); background: var(--surface); border: 1px solid var(--border2); border-radius: 14px; padding: 11px 14px; display: flex; align-items: center; gap: 11px; box-shadow: 0 6px 28px rgba(0,0,0,0.14); z-index: 998; min-width: 270px; max-width: 360px; width: 92%; animation: slideUp 0.3s cubic-bezier(0.34,1.56,0.64,1); }
+@keyframes slideUp { from{opacity:0;transform:translateX(-50%) translateY(18px)} to{opacity:1;transform:translateX(-50%) translateY(0)} }
+.pwa-ico { font-size: 26px; flex-shrink: 0; }
+.pwa-text { flex: 1; }
+.pwa-text strong { font-size: 13px; font-weight: 600; display: block; margin-bottom: 1px; }
+.pwa-text span { font-size: 11px; color: var(--text2); }
+.pwa-install { padding: 7px 13px; background: var(--green); color: #fff; border: none; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; font-family: 'DM Sans', sans-serif; }
+.pwa-install:hover { background: var(--green-dark); }
+.pwa-close { width: 22px; height: 22px; border-radius: 50%; border: 1px solid var(--border2); background: var(--surface2); cursor: pointer; font-size: 11px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: var(--text3); }
+
+/* CONNECTION STATUS */
+.conn-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text3); display: inline-block; margin-right: 5px; }
+.conn-dot.ok   { background: var(--green); box-shadow: 0 0 0 3px rgba(29,158,117,0.2); }
+.conn-dot.err  { background: var(--red); }
+.conn-status { font-size: 12px; color: var(--text2); display: flex; align-items: center; gap: 3px; cursor: pointer; padding: 4px 8px; border-radius: 6px; border: 1px solid var(--border2); background: var(--surface2); }
+.conn-status:hover { border-color: var(--green); }
+
+/* SERVER SETUP MODAL */
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 700; display: flex; align-items: center; justify-content: center; padding: 20px; }
+.modal-box { background: var(--surface); border-radius: 18px; padding: 26px 24px; max-width: 400px; width: 100%; border: 1px solid var(--border2); box-shadow: 0 20px 60px rgba(0,0,0,0.2); animation: popIn 0.25s cubic-bezier(0.34,1.56,0.64,1); }
+@keyframes popIn { from{opacity:0;transform:scale(0.88)} to{opacity:1;transform:scale(1)} }
+.modal-box h3 { font-family: 'Syne', sans-serif; font-size: 16px; font-weight: 700; margin-bottom: 6px; }
+.modal-box p  { font-size: 13px; color: var(--text2); line-height: 1.6; margin-bottom: 18px; }
+.modal-actions { display: flex; gap: 8px; margin-top: 16px; }
+.btn-primary { flex: 1; padding: 10px; background: var(--green); color: #fff; border: none; border-radius: 9px; font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; }
+.btn-primary:hover { background: var(--green-dark); }
+.btn-secondary { padding: 10px 16px; background: var(--surface2); color: var(--text2); border: 1px solid var(--border2); border-radius: 9px; font-family: 'DM Sans', sans-serif; font-size: 13px; cursor: pointer; }
+.share-link-box { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 9px 12px; font-size: 12px; color: var(--text2); word-break: break-all; margin-top: 8px; display: flex; align-items: center; gap: 8px; }
+.copy-link-btn { flex-shrink: 0; padding: 4px 10px; background: var(--green-light); color: var(--green-dark); border: 1px solid var(--green); border-radius: 6px; font-size: 12px; cursor: pointer; font-family: 'DM Sans', sans-serif; }
+
+@media (max-width: 780px) { .layout { grid-template-columns: 1fr; } .feed-col { max-height: none; } }
+</style>
+</head>
+<body>
+
+<!-- SERVER SETUP MODAL -->
+<div class="modal-overlay" id="serverModal" style="display:none">
+  <div class="modal-box">
+    <h3>🔌 Connect to your Server</h3>
+    <p>Paste your Cloudflare tunnel URL and admin password from Termux below.</p>
+    <div class="fgrp" style="margin-bottom:12px">
+      <label for="serverUrlIn">Tunnel URL</label>
+      <input class="finput" id="serverUrlIn" type="url" placeholder="https://xxxx.trycloudflare.com">
+    </div>
+    <div class="fgrp">
+      <label for="serverPassIn">Admin Password</label>
+      <input class="finput" id="serverPassIn" type="password" placeholder="Your admin password from config.json">
+    </div>
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="closeServerModal()">Cancel</button>
+      <button class="btn-primary" onclick="saveServerConfig()">Connect →</button>
+    </div>
+    <div id="serverTestResult" style="margin-top:10px;font-size:12px;color:var(--text3)"></div>
+
+    <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border)">
+      <label style="font-size:11px;font-weight:500;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:6px">📎 Shareable User Link</label>
+      <p style="font-size:12px;color:var(--text2);margin-bottom:8px">Share this link so users auto-connect to your server:</p>
+      <div class="share-link-box">
+        <span id="shareableLinkText" style="flex:1">Configure server URL first</span>
+        <button class="copy-link-btn" onclick="copyShareableLink()">Copy</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<header class="topbar">
+  <div class="logo"><div class="logo-dot"></div> Quickgeo</div>
+  <div class="topbar-right">
+    <span class="admin-badge">⚙ Admin</span>
+    <button class="conn-status" id="connStatus" onclick="openServerModal()" title="Server connection settings">
+      <span class="conn-dot" id="connDot"></span>
+      <span id="connLabel">Not connected</span>
+    </button>
+    <button class="icon-btn" id="themeBtn" onclick="toggleTheme()" aria-label="Toggle dark/light mode">🌙</button>
+    <a href="index.html" class="user-link" target="_blank" rel="noopener">↗ View Site</a>
+    <button class="user-link" onclick="logout()" style="cursor:pointer;background:none;color:var(--red,#e24b4a);border-color:var(--red,#e24b4a)">⏻ Logout</button>
+  </div>
+</header>
+
+<div class="layout">
+
+  <!-- LEFT: COMPOSER + CATEGORIES -->
+  <div>
+    <div class="main-tabs">
+      <button class="mtab active" onclick="showPanel('compose')">✏️ New Post</button>
+      <button class="mtab" onclick="showPanel('categories')">🏷 Categories</button>
+    </div>
+
+    <!-- COMPOSE PANEL -->
+    <div id="panel-compose">
+      <div class="card">
+        <div class="card-head-bar">
+          <h2>New Post</h2>
+          <div class="media-tabs">
+            <button class="mtb active" onclick="switchTab('text')">📝 Text</button>
+            <button class="mtb" onclick="switchTab('image')">🖼 Image / Video</button>
+            <button class="mtb" onclick="switchTab('gif')">🎞 GIF</button>
+          </div>
+        </div>
+        <div class="card-body">
+
+          <div class="fgrp">
+            <label for="catSelect">Category</label>
+            <select class="fselect" id="catSelect"></select>
+          </div>
+
+          <div class="fgrp">
+            <label for="postText">Message</label>
+            <textarea class="ftextarea" id="postText" placeholder="Write your news update here…" maxlength="2000" oninput="updateCharCount()"></textarea>
+            <div class="char-count" id="charCount">0 / 2000</div>
+          </div>
+
+          <!-- Image / Video tab -->
+          <div id="tab-image" style="display:none" class="fgrp">
+            <label>Media</label>
+            <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()" role="button" tabindex="0" aria-label="Upload media">
+              <div class="dz-icon">📎</div>
+              <div class="dz-text">Click or drag &amp; drop image / video</div>
+              <div class="dz-hint">JPG, PNG, GIF, MP4, WEBM — max 50 MB each</div>
+            </div>
+            <input type="file" id="fileInput" accept="image/*,video/*" multiple>
+            <div class="prev-grid" id="prevGrid"></div>
+          </div>
+
+          <!-- GIF tab -->
+          <div id="tab-gif" style="display:none" class="fgrp">
+            <label>Search GIFs</label>
+            <div class="gif-row">
+              <input class="gif-in" id="gifQuery" placeholder="e.g. satellite map…" onkeydown="if(event.key==='Enter') searchGifs()">
+              <button class="gif-go" onclick="searchGifs()">Search</button>
+            </div>
+            <div class="gif-grid" id="gifGrid"></div>
+          </div>
+
+          <button class="pub-btn" id="pubBtn" onclick="publishPost()">Publish Post →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- CATEGORY PANEL -->
+    <div id="panel-categories" style="display:none">
+      <div class="cat-mgr">
+        <h2>Manage Categories</h2>
+        <div class="fgrp">
+          <label>New Category</label>
+          <div class="cat-add-row">
+            <button class="cat-emoji-btn" id="emojiPickerBtn" onclick="toggleEmojiPicker()" aria-label="Pick emoji">😀</button>
+            <input class="cat-name-in" id="catNameIn" placeholder="Category name…" maxlength="30" onkeydown="if(event.key==='Enter')addCat()">
+            <button class="cat-add-btn" onclick="addCat()">+ Add</button>
+          </div>
+          <div id="emojiPickerPop" style="display:none" class="emoji-picker-pop"></div>
+        </div>
+        <div class="cat-list" id="catList"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT: LIVE PREVIEW -->
+  <div class="feed-col">
+    <div class="feed-hdr">
+      <h3>Published Posts</h3>
+      <span class="post-count" id="postCount">0 posts</span>
+    </div>
+    <div id="adminFeed">
+      <div class="empty-msg">No posts yet. Publish your first update!</div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+'use strict';
+
+/* ── THEME ── */
+let currentTheme = localStorage.getItem('qg_theme') ||
+  (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+applyTheme(currentTheme, false);
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
+  if (!localStorage.getItem('qg_theme')) applyTheme(e.matches ? 'dark' : 'light', false);
+});
+function applyTheme(t, save) {
+  currentTheme = t;
+  document.documentElement.setAttribute('data-theme', t);
+  const btn = document.getElementById('themeBtn');
+  if (btn) btn.textContent = t === 'dark' ? '☀️' : '🌙';
+  if (save) localStorage.setItem('qg_theme', t);
+}
+function toggleTheme() { applyTheme(currentTheme === 'dark' ? 'light' : 'dark', true); }
+
+/* ── API LAYER (session token auth) ── */
+const API = {
+  base()  {
+    // Prefer sessionStorage (set by login page), fallback to localStorage
+    return (sessionStorage.getItem('qg_server') || localStorage.getItem('qg_server') || '').replace(/\/$/, '');
+  },
+  token() { return sessionStorage.getItem('qg_token') || ''; },
+  isOk()  { return !!(this.base() && this.token()); },
+  headers(auth = false) {
+    const h = { 'Content-Type': 'application/json' };
+    if (auth) h['Authorization'] = `Bearer ${this.token()}`;
+    return h;
+  },
+  async get(path) {
+    const r = await fetch(this.base() + path, { headers: this.headers() });
+    if (r.status === 401) { redirectToLogin(); throw new Error('Unauthorized'); }
+    if (!r.ok) throw new Error(`${r.status}`);
+    return r.json();
+  },
+  async post(path, body, auth = false) {
+    const r = await fetch(this.base() + path, { method: 'POST', headers: this.headers(auth), body: JSON.stringify(body) });
+    if (r.status === 401) { redirectToLogin(); throw new Error('Unauthorized'); }
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || `${r.status}`);
+    return data;
+  },
+  async del(path) {
+    const r = await fetch(this.base() + path, { method: 'DELETE', headers: this.headers(true) });
+    if (r.status === 401) { redirectToLogin(); throw new Error('Unauthorized'); }
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || `${r.status}`);
+    return data;
+  },
+  async patch(path, body = {}) {
+    const r = await fetch(this.base() + path, { method: 'PATCH', headers: this.headers(true), body: JSON.stringify(body) });
+    if (r.status === 401) { redirectToLogin(); throw new Error('Unauthorized'); }
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || `${r.status}`);
+    return data;
+  }
+};
+
+function redirectToLogin() {
+  sessionStorage.removeItem('qg_token');
+  window.location.href = './qg-secure-login.html';
+}
+
+async function logout() {
+  try { await API.post('/api/logout', {}, true); } catch {}
+  sessionStorage.removeItem('qg_token');
+  sessionStorage.removeItem('qg_server');
+  window.location.href = './qg-secure-login.html';
+}
+
+
+/* ── SERVER SETUP MODAL ── */
+function openServerModal() {
+  try {
+    const urlEl  = document.getElementById('serverUrlIn');
+    const passEl = document.getElementById('serverPassIn');
+    const resEl  = document.getElementById('serverTestResult');
+    const modal  = document.getElementById('serverModal');
+    if (!modal) { alert('Modal not found — please re-upload admin.html'); return; }
+    if (urlEl)  urlEl.value  = localStorage.getItem('qg_server') || '';
+    if (passEl) passEl.value = localStorage.getItem('qg_admin_pass') || '';
+    if (resEl)  resEl.textContent = '';
+    updateShareableLink();
+    modal.style.display = 'flex';
+    if (urlEl) setTimeout(() => urlEl.focus(), 100);
+  } catch(e) {
+    console.error('openServerModal error:', e);
+    alert('Error opening modal: ' + e.message);
+  }
+}
+function closeServerModal() {
+  const modal = document.getElementById('serverModal');
+  if (modal) modal.style.display = 'none';
+}
+
+async function saveServerConfig() {
+  const url  = document.getElementById('serverUrlIn').value.trim().replace(/\/$/, '');
+  const pass = document.getElementById('serverPassIn').value.trim();
+  const res  = document.getElementById('serverTestResult');
+  if (!url || !pass) { res.textContent = '⚠ Please fill in both fields.'; res.style.color = 'var(--amber)'; return; }
+
+  res.textContent = '🔄 Testing connection…'; res.style.color = 'var(--text3)';
+
+  try {
+    const r = await fetch(url + '/health');
+    const d = await r.json();
+    if (d.status !== 'ok') throw new Error('Bad response');
+
+    localStorage.setItem('qg_server', url);
+    localStorage.setItem('qg_admin_pass', pass);
+    res.textContent = `✅ Connected! Server has ${d.posts} post${d.posts!==1?'s':''}.`;
+    res.style.color = 'var(--green)';
+    updateConnStatus(true);
+    updateShareableLink();
+    setTimeout(() => { closeServerModal(); init(); }, 1200);
+  } catch (e) {
+    res.textContent = '❌ Could not connect. Check the URL and make sure your server is running.';
+    res.style.color = 'var(--red)';
+    updateConnStatus(false);
+  }
+}
+
+function updateShareableLink() {
+  const server = localStorage.getItem('qg_server') || '';
+  const el = document.getElementById('shareableLinkText');
+  if (el) el.textContent = server
+    ? `${location.origin}${location.pathname.replace('admin.html','index.html')}?server=${encodeURIComponent(server)}`
+    : 'Configure server URL first';
+}
+
+function copyShareableLink() {
+  const text = document.getElementById('shareableLinkText').textContent;
+  if (text.includes('Configure')) return;
+  navigator.clipboard && navigator.clipboard.writeText(text).catch(() => {});
+  const btn = document.querySelector('.copy-link-btn');
+  if (btn) { btn.textContent = '✓ Copied!'; setTimeout(() => { btn.textContent = 'Copy'; }, 2000); }
+}
+
+function updateConnStatus(ok) {
+  const dot   = document.getElementById('connDot');
+  const label = document.getElementById('connLabel');
+  if (!dot || !label) return;
+  dot.className = 'conn-dot ' + (ok ? 'ok' : 'err');
+  label.textContent = ok ? 'Connected' : 'Not connected';
+}
+
+/* ── TOAST ── */
+function showToast(msg, type = 'ok') {
+  const old = document.getElementById('toast');
+  if (old) old.remove();
+  const t = document.createElement('div');
+  t.id = 'toast'; t.className = 'toast';
+  t.style.background = type === 'err' ? '#e24b4a' : 'var(--text)';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => { if (t.parentNode) t.remove(); }, 2600);
+}
+
+/* ── PANELS ── */
+function showPanel(p) {
+  document.getElementById('panel-compose').style.display    = p === 'compose'    ? 'block' : 'none';
+  document.getElementById('panel-categories').style.display = p === 'categories' ? 'block' : 'none';
+  document.querySelectorAll('.mtab').forEach((t,i) =>
+    t.classList.toggle('active', ['compose','categories'][i] === p));
+  if (p === 'categories') renderCatList();
+}
+
+/* ── CHAR COUNT ── */
+function updateCharCount() {
+  const ta = document.getElementById('postText');
+  const cc = document.getElementById('charCount');
+  const len = ta.value.length;
+  cc.textContent = `${len} / 2000`;
+  cc.className = 'char-count' + (len > 1800 ? (len >= 2000 ? ' over' : ' warn') : '');
+}
+
+/* ── MEDIA TABS ── */
+let activeTab = 'text';
+let uploadedFiles = [];
+let selectedGif = null;
+
+function switchTab(tab) {
+  activeTab = tab;
+  document.querySelectorAll('.mtb').forEach((t,i) =>
+    t.classList.toggle('active', ['text','image','gif'][i] === tab));
+  document.getElementById('tab-image').style.display = tab === 'image' ? 'block' : 'none';
+  document.getElementById('tab-gif').style.display   = tab === 'gif'   ? 'block' : 'none';
+}
+
+const fileInput = document.getElementById('fileInput');
+const dropZone  = document.getElementById('dropZone');
+const prevGrid  = document.getElementById('prevGrid');
+
+fileInput.onchange = e => handleFiles(e.target.files);
+dropZone.addEventListener('dragover',  e => { e.preventDefault(); dropZone.classList.add('drag'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag'));
+dropZone.addEventListener('drop',      e => { e.preventDefault(); dropZone.classList.remove('drag'); handleFiles(e.dataTransfer.files); });
+dropZone.addEventListener('keydown',   e => { if(e.key==='Enter'||e.key===' ') fileInput.click(); });
+
+function handleFiles(files) {
+  Array.from(files).forEach(file => {
+    if (file.size > 50 * 1024 * 1024) { showToast(`"${file.name}" is too large (max 50 MB)`, 'err'); return; }
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const obj = { url: ev.target.result, type: file.type || '' };
+      uploadedFiles.push(obj);
+      renderPreview(obj, uploadedFiles.length - 1);
+    };
+    reader.readAsDataURL(file);
+  });
+}
+function renderPreview(obj, idx) {
+  const wrap = document.createElement('div');
+  wrap.className = 'prev-item'; wrap.id = 'prev-' + idx;
+  const isVid = (obj.type || '').startsWith('video');
+  wrap.innerHTML = isVid
+    ? `<video src="${obj.url}" muted></video><button class="prev-rm" onclick="removeFile(${idx})">✕</button>`
+    : `<img src="${obj.url}" alt=""><button class="prev-rm" onclick="removeFile(${idx})">✕</button>`;
+  prevGrid.appendChild(wrap);
+}
+function removeFile(idx) {
+  uploadedFiles[idx] = null;
+  const el = document.getElementById('prev-' + idx);
+  if (el) el.remove();
+}
+
+/* ── GIF SEARCH ── */
+function searchGifs() {
+  const q = document.getElementById('gifQuery').value.trim();
+  if (!q) return;
+  const grid = document.getElementById('gifGrid');
+  grid.innerHTML = '<p style="grid-column:1/-1;font-size:12px;color:var(--text3);padding:8px">Searching…</p>';
+  selectedGif = null;
+  fetch(`https://api.giphy.com/v1/gifs/search?api_key=dc6zaTOxFJmzC&q=${encodeURIComponent(q)}&limit=9&rating=g`)
+    .then(r => r.json())
+    .then(data => {
+      grid.innerHTML = '';
+      if (!data.data?.length) { grid.innerHTML = '<p style="grid-column:1/-1;font-size:12px;color:var(--text3);padding:8px">No GIFs found.</p>'; return; }
+      data.data.forEach(gif => {
+        const img = document.createElement('img');
+        img.src = gif.images.fixed_height_small.url;
+        img.dataset.full = gif.images.downsized_medium.url;
+        img.alt = gif.title || 'GIF'; img.loading = 'lazy';
+        img.onclick = () => { grid.querySelectorAll('img').forEach(i => i.classList.remove('sel')); img.classList.add('sel'); selectedGif = img.dataset.full; };
+        grid.appendChild(img);
+      });
+    })
+    .catch(() => { grid.innerHTML = '<p style="grid-column:1/-1;font-size:12px;color:var(--text3);padding:8px">Could not load GIFs.</p>'; });
+}
+
+/* ── PUBLISH ── */
+async function publishPost() {
+  if (!API.isOk()) { openServerModal(); showToast('Connect to server first', 'err'); return; }
+
+  const text = document.getElementById('postText').value.trim();
+  const tagVal = document.getElementById('catSelect').value;
+  const cats = await fetchCatsAPI();
+  const cat = cats.find(c => c.name === tagVal) || { emoji: '📌', name: tagVal || 'Update' };
+
+  if (!text && activeTab === 'text') {
+    const ta = document.getElementById('postText');
+    ta.focus(); ta.style.borderColor = 'var(--red)';
+    setTimeout(() => { ta.style.borderColor = ''; }, 1500);
+    return;
+  }
+
+  const media = [];
+  if (activeTab === 'image') uploadedFiles.filter(Boolean).forEach(f => media.push({ url: f.url, type: f.type || '' }));
+  else if (activeTab === 'gif' && selectedGif) media.push({ url: selectedGif, type: 'gif' });
+
+  const btn = document.getElementById('pubBtn');
+  btn.disabled = true; btn.textContent = 'Publishing…';
+
+  try {
+    await API.post('/api/posts', { tag: cat.name, tagEmoji: cat.emoji, text, media }, true);
+    // Reset
+    document.getElementById('postText').value = '';
+    updateCharCount();
+    prevGrid.innerHTML = '';
+    uploadedFiles = []; selectedGif = null;
+    document.getElementById('gifGrid').innerHTML = '';
+    document.getElementById('gifQuery').value = '';
+    showToast('✓ Post published!');
+    renderAdminFeed();
+  } catch (e) {
+    showToast(`❌ Failed: ${e.message}`, 'err');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Publish Post →';
+  }
+}
+
+/* ── ADMIN FEED ── */
+async function confirmDelete(id, btn) {
+  if (!API.isOk()) { openServerModal(); return; }
+  if (btn.dataset.confirming) {
+    try {
+      await API.del(`/api/posts/${id}`);
+      showToast('Post deleted.');
+      renderAdminFeed();
+    } catch (e) { showToast(`❌ ${e.message}`, 'err'); }
+  } else {
+    btn.dataset.confirming = '1'; btn.textContent = '⚠ Sure?';
+    btn.style.background = 'var(--red-light)'; btn.style.borderColor = 'var(--red)';
+    setTimeout(() => {
+      if (btn?.parentNode) { btn.textContent = '🗑 Delete'; btn.style.background = ''; btn.style.borderColor = ''; delete btn.dataset.confirming; }
+    }, 2500);
+  }
+}
+
+async function togglePin(id) {
+  if (!API.isOk()) { openServerModal(); return; }
+  try {
+    await API.patch(`/api/posts/${id}/pin`);
+    renderAdminFeed();
+  } catch (e) { showToast(`❌ ${e.message}`, 'err'); }
+}
+
+async function renderAdminFeed() {
+  const feed     = document.getElementById('adminFeed');
+  const countEl  = document.getElementById('postCount');
+
+  if (!API.isOk()) {
+    feed.innerHTML = `<div class="empty-msg">
+      <div style="font-size:32px;margin-bottom:8px">🔌</div>
+      <div>Not connected to server.</div>
+      <div style="margin-top:8px"><button onclick="openServerModal()" style="color:var(--green);background:var(--green-light);border:1px solid var(--green);border-radius:7px;padding:5px 12px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:13px;">Connect →</button></div>
+    </div>`;
+    if (countEl) countEl.textContent = '—';
+    return;
+  }
+
+  try {
+    const posts = await API.get('/api/posts');
+    if (countEl) countEl.textContent = `${posts.length} post${posts.length !== 1 ? 's' : ''}`;
+
+    if (!posts.length) { feed.innerHTML = '<div class="empty-msg">No posts yet. Publish your first update!</div>'; return; }
+
+    feed.innerHTML = '';
+    [...posts].sort((a,b) => (b.pinned?1:0) - (a.pinned?1:0)).forEach(post => {
+      const card = document.createElement('div');
+      card.className = 'pcard';
+      const rxnHTML = Object.entries(post.reactions || {}).filter(([,n])=>n>0).map(([e,n])=>`<span class="rpill">${e} ${n}</span>`).join('');
+      const mediaHTML = (post.media || []).map(m => {
+        const mt = m.type || '';
+        if (mt === 'gif' || mt.startsWith('image')) return `<img class="pmedia" src="${m.url}" alt="" loading="lazy">`;
+        if (mt.startsWith('video')) return `<video class="pmedia" src="${m.url}" controls preload="metadata"></video>`;
+        return '';
+      }).join('');
+      card.innerHTML = `
+        ${post.pinned ? '<div class="ppin-lbl">📌 Pinned</div>' : ''}
+        <div class="pcard-hd">
+          <span class="ptag">${post.tagEmoji||''} ${post.tag}</span>
+          <span class="ptime">${post.date} · ${post.time}</span>
+        </div>
+        ${post.text ? `<div class="pbody">${post.text}</div>` : ''}
+        ${mediaHTML}
+        ${rxnHTML ? `<div class="preacts">${rxnHTML}</div>` : ''}
+        <div class="pactions">
+          <button class="act-pin" onclick="togglePin(${post.id})">${post.pinned?'📌 Unpin':'📌 Pin'}</button>
+          <button class="act-del" onclick="confirmDelete(${post.id}, this)">🗑 Delete</button>
+        </div>`;
+      feed.appendChild(card);
+    });
+  } catch (e) {
+    feed.innerHTML = `<div class="empty-msg" style="color:var(--red)">⚠ Could not load posts.<br><small>${e.message}</small></div>`;
+  }
+}
+
+/* ── CATEGORY SELECT ── */
+async function fetchCatsAPI() {
+  try {
+    if (API.isOk()) {
+      const cats = await API.get('/api/categories');
+      localStorage.setItem('qg_cache_cats', JSON.stringify(cats));
+      return cats;
+    }
+  } catch (e) { console.warn('Category fetch failed:', e.message); }
+  try { return JSON.parse(localStorage.getItem('qg_cache_cats') || '[]') || DEFAULT_CATS; }
+  catch { return DEFAULT_CATS; }
+}
+
+const DEFAULT_CATS = [
+  {emoji:'🔴',name:'Breaking'},{emoji:'🗺',name:'Maps'},{emoji:'🛰',name:'Satellite'},
+  {emoji:'🌐',name:'OSM'},{emoji:'📊',name:'Data'},{emoji:'✨',name:'Feature'},{emoji:'🔄',name:'Update'}
+];
+
+async function renderCatSelect() {
+  const sel = document.getElementById('catSelect');
+  if (!sel) return;
+  const cats = await fetchCatsAPI();
+  sel.innerHTML = cats.map(c => `<option value="${c.name}">${c.emoji} ${c.name}</option>`).join('');
+}
+
+/* ── CATEGORY MANAGER ── */
+const EMOJI_LIST = ['🔴','🟠','🟡','🟢','🔵','🟣','⚪','🌍','🛰','🗺','📡','📊','📰','⚡','🔥','💡','🌿','🏙','🚨','📍','✅','❗','🔔','🎯','🌐','📸','🎞','📹','🎉','🔄','✨','💥','📢','🏷','🔖','⭐','🌟','💎','🧭','🔬'];
+let selectedEmoji = '📌';
+
+async function renderCatList() {
+  const list = document.getElementById('catList');
+  list.innerHTML = '<div style="text-align:center;color:var(--text3);font-size:13px;padding:12px">Loading…</div>';
+  const cats = await fetchCatsAPI();
+  if (!cats.length) { list.innerHTML = '<div style="text-align:center;color:var(--text3);font-size:13px;padding:12px">No categories yet.</div>'; return; }
+  list.innerHTML = '';
+  cats.forEach((cat) => {
+    const isDef = DEFAULT_CATS.some(d => d.name === cat.name);
+    const item = document.createElement('div');
+    item.className = 'cat-item';
+    item.innerHTML = `
+      <span class="cat-item-icon">${cat.emoji}</span>
+      <span class="cat-item-name">${cat.name}</span>
+      ${isDef ? '<span class="cat-item-def">default</span>' : `<button class="cat-rm" onclick="removeCat('${cat.name}',this)">Remove</button>`}`;
+    list.appendChild(item);
+  });
+}
+
+function toggleEmojiPicker() {
+  const pop = document.getElementById('emojiPickerPop');
+  if (pop.style.display !== 'none') { pop.style.display = 'none'; return; }
+  pop.innerHTML = '';
+  EMOJI_LIST.forEach(e => {
+    const b = document.createElement('div'); b.className = 'ep-e'; b.textContent = e;
+    b.onclick = () => { selectedEmoji = e; document.getElementById('emojiPickerBtn').textContent = e; pop.style.display = 'none'; };
+    pop.appendChild(b);
+  });
+  pop.style.display = 'flex';
+}
+
+async function addCat() {
+  if (!API.isOk()) { openServerModal(); return; }
+  const inp = document.getElementById('catNameIn');
+  const name = inp.value.trim();
+  if (!name) { inp.focus(); return; }
+  try {
+    await API.post('/api/categories', { emoji: selectedEmoji, name }, true);
+    inp.value = ''; selectedEmoji = '📌';
+    document.getElementById('emojiPickerBtn').textContent = '😀';
+    renderCatList(); renderCatSelect();
+    showToast(`✓ Category "${name}" added!`);
+  } catch (e) { showToast(`❌ ${e.message}`, 'err'); }
+}
+
+async function removeCat(name, btn) {
+  if (!API.isOk()) { openServerModal(); return; }
+  if (btn.dataset.confirming) {
+    try {
+      await API.del(`/api/categories/${encodeURIComponent(name)}`);
+      renderCatList(); renderCatSelect();
+      showToast('Category removed.');
+    } catch (e) { showToast(`❌ ${e.message}`, 'err'); }
+  } else {
+    btn.dataset.confirming = '1'; btn.textContent = '⚠ Sure?';
+    btn.style.background = 'var(--red-light)';
+    setTimeout(() => { if (btn?.parentNode) { btn.textContent = 'Remove'; btn.style.background = ''; delete btn.dataset.confirming; } }, 2500);
+  }
+}
+
+/* ── PWA ── */
+let deferredInstall = null;
+if ('serviceWorker' in navigator) { navigator.serviceWorker.register('./admin-sw.js').catch(() => {}); }
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault(); deferredInstall = e;
+  if (!localStorage.getItem('qg_admin_pwa_skip')) showPWABanner();
+});
+function showPWABanner() {
+  if (document.getElementById('pwaBanner')) return;
+  const b = document.createElement('div');
+  b.className = 'pwa-banner'; b.id = 'pwaBanner';
+  b.innerHTML = `<div class="pwa-ico">🗺️</div><div class="pwa-text"><strong>Install Quickgeo Admin</strong><span>Add to desktop or home screen</span></div><button class="pwa-install" onclick="triggerInstall()">Install</button><button class="pwa-close" onclick="dismissPWA()">✕</button>`;
+  document.body.appendChild(b);
+}
+async function triggerInstall() {
+  if (!deferredInstall) return;
+  deferredInstall.prompt();
+  const { outcome } = await deferredInstall.userChoice;
+  deferredInstall = null; dismissPWA();
+  if (outcome === 'accepted') showToast('✓ App installed!');
+}
+function dismissPWA() { localStorage.setItem('qg_admin_pwa_skip','1'); const b=document.getElementById('pwaBanner'); if(b)b.remove(); }
+
+/* ── INIT ── */
+async function init() {
+  // Guard: redirect to login if no session token
+  if (!API.token()) { redirectToLogin(); return; }
+
+  // Verify token is still valid with server
+  try {
+    await API.get('/api/me');
+    updateConnStatus(true);
+  } catch(e) {
+    if (e.message === 'Unauthorized') return; // redirectToLogin already called
+    updateConnStatus(false);
+    showToast('⚠ Cannot reach server — check your connection', 'err');
+  }
+
+  await renderCatSelect();
+  await renderAdminFeed();
+}
+
+// Hash routing
+const hash = location.hash.replace('#', '');
+if (hash === 'categories') showPanel('categories');
+
+init();
+</script>
+</body>
+</html>

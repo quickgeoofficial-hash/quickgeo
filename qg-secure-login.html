@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quickgeo — Sign In</title>
+<meta name="robots" content="noindex, nofollow">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --green: #1D9E75; --green-dark: #0F6E56; --green-light: #E1F5EE;
+  --bg: #f4f5f0; --surface: #fff;
+  --border: rgba(0,0,0,0.1); --border2: rgba(0,0,0,0.18);
+  --text: #1a1a18; --text2: #56564f; --text3: #96968e;
+  --red: #e24b4a;
+}
+[data-theme="dark"] {
+  --bg: #111110; --surface: #1c1c19;
+  --border: rgba(255,255,255,0.08); --border2: rgba(255,255,255,0.15);
+  --text: #e6e6e0; --text2: #96968e; --text3: #555550;
+  --green-light: rgba(29,158,117,0.14);
+}
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--bg); color: var(--text);
+  min-height: 100vh; display: flex; align-items: center; justify-content: center;
+  padding: 20px; transition: background 0.25s, color 0.25s;
+}
+.card {
+  background: var(--surface); border-radius: 20px; border: 1px solid var(--border);
+  box-shadow: 0 8px 40px rgba(0,0,0,0.1); padding: 40px 36px;
+  width: 100%; max-width: 380px;
+}
+.logo { display: flex; align-items: center; gap: 8px; margin-bottom: 28px; }
+.logo-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--green); }
+.logo-text { font-family: 'Syne', sans-serif; font-size: 20px; font-weight: 700; }
+h1 { font-family: 'Syne', sans-serif; font-size: 22px; font-weight: 700; margin-bottom: 6px; }
+.sub { font-size: 13px; color: var(--text2); margin-bottom: 28px; }
+.fgrp { margin-bottom: 16px; }
+label { font-size: 11px; font-weight: 500; color: var(--text2); text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 5px; }
+input {
+  width: 100%; padding: 11px 13px; border: 1px solid var(--border2); border-radius: 9px;
+  font-family: 'DM Sans', sans-serif; font-size: 14px; background: var(--bg); color: var(--text);
+  outline: none; transition: border-color 0.15s;
+}
+input:focus { border-color: var(--green); }
+.server-row { display: flex; gap: 8px; align-items: flex-end; margin-bottom: 20px; }
+.server-row .fgrp { flex: 1; margin-bottom: 0; }
+.server-edit { padding: 11px 12px; background: var(--bg); border: 1px solid var(--border2); border-radius: 9px; font-size: 12px; color: var(--text2); cursor: pointer; white-space: nowrap; font-family: 'DM Sans', sans-serif; }
+.server-edit:hover { border-color: var(--green); color: var(--green); }
+.btn {
+  width: 100%; padding: 13px; background: var(--green); color: #fff; border: none;
+  border-radius: 10px; font-family: 'Syne', sans-serif; font-size: 15px; font-weight: 600;
+  cursor: pointer; transition: background 0.15s; display: flex; align-items: center; justify-content: center; gap: 8px;
+}
+.btn:hover { background: var(--green-dark); }
+.btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.error {
+  background: #fff0f0; border: 1px solid #f7c1c1; border-radius: 8px;
+  padding: 10px 13px; font-size: 13px; color: var(--red); margin-bottom: 16px; display: none;
+}
+[data-theme="dark"] .error { background: rgba(226,75,74,0.12); border-color: rgba(226,75,74,0.3); }
+.theme-toggle { position: fixed; top: 16px; right: 16px; width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--border2); background: var(--surface); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 15px; }
+.server-info { font-size: 11px; color: var(--text3); margin-bottom: 20px; display: flex; align-items: center; gap: 5px; }
+.server-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text3); flex-shrink: 0; }
+.server-dot.ok { background: var(--green); }
+</style>
+</head>
+<body>
+
+<button class="theme-toggle" id="themeBtn" onclick="toggleTheme()">🌙</button>
+
+<div class="card">
+  <div class="logo"><div class="logo-dot"></div><span class="logo-text">Quickgeo</span></div>
+  <h1>Admin Sign In</h1>
+  <p class="sub">Enter your credentials to access the admin panel.</p>
+
+  <div class="server-info">
+    <div class="server-dot" id="serverDot"></div>
+    <span id="serverInfoText">No server configured</span>
+    <button class="server-edit" onclick="changeServer()">Change</button>
+  </div>
+
+  <div class="error" id="errorBox"></div>
+
+  <div class="fgrp">
+    <label for="username">Username</label>
+    <input id="username" type="text" placeholder="admin username" autocomplete="username" onkeydown="if(event.key==='Enter')login()">
+  </div>
+  <div class="fgrp">
+    <label for="password">Password</label>
+    <input id="password" type="password" placeholder="••••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')login()">
+  </div>
+
+  <button class="btn" id="loginBtn" onclick="login()">
+    <span id="btnText">Sign In</span>
+  </button>
+</div>
+
+<script>
+'use strict';
+
+/* ── THEME ── */
+let theme = localStorage.getItem('qg_theme') ||
+  (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+applyTheme(theme);
+function applyTheme(t) {
+  theme = t;
+  document.documentElement.setAttribute('data-theme', t);
+  document.getElementById('themeBtn').textContent = t === 'dark' ? '☀️' : '🌙';
+  localStorage.setItem('qg_theme', t);
+}
+function toggleTheme() { applyTheme(theme === 'dark' ? 'light' : 'dark'); }
+
+/* ── SERVER CONFIG ── */
+// Check for ?server= param in URL (shared link)
+const params = new URLSearchParams(location.search);
+const urlServer = params.get('server');
+if (urlServer) {
+  localStorage.setItem('qg_server', urlServer.replace(/\/$/, ''));
+  history.replaceState({}, '', location.pathname);
+}
+
+function getServer() { return (localStorage.getItem('qg_server') || '').replace(/\/$/, ''); }
+
+function changeServer() {
+  const url = prompt('Enter your server URL (e.g. https://api.yourdomain.com):',
+    getServer() || '');
+  if (url && url.trim()) {
+    localStorage.setItem('qg_server', url.trim().replace(/\/$/, ''));
+    checkServer();
+  }
+}
+
+async function checkServer() {
+  const dot  = document.getElementById('serverDot');
+  const info = document.getElementById('serverInfoText');
+  const srv  = getServer();
+  if (!srv) {
+    dot.className = 'server-dot';
+    info.textContent = 'No server configured — click Change';
+    return;
+  }
+  info.textContent = 'Checking…';
+  try {
+    const r = await fetch(srv + '/health');
+    const d = await r.json();
+    dot.className = 'server-dot ok';
+    info.textContent = `Connected · ${new URL(srv).hostname}`;
+  } catch {
+    dot.className = 'server-dot';
+    info.textContent = 'Cannot reach server — is it running?';
+  }
+}
+
+/* ── LOGIN ── */
+async function login() {
+  const btn      = document.getElementById('loginBtn');
+  const btnText  = document.getElementById('btnText');
+  const errorBox = document.getElementById('errorBox');
+  const username = document.getElementById('username').value.trim();
+  const password = document.getElementById('password').value;
+  const server   = getServer();
+
+  errorBox.style.display = 'none';
+
+  if (!server) { showError('No server configured. Click "Change" to set your server URL.'); return; }
+  if (!username || !password) { showError('Please enter both username and password.'); return; }
+
+  btn.disabled = true; btnText.textContent = 'Signing in…';
+
+  try {
+    const r = await fetch(server + '/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password })
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'Login failed');
+
+    // Store session token
+    sessionStorage.setItem('qg_token', data.token);
+    sessionStorage.setItem('qg_server', server);
+
+    // Redirect to admin panel
+    window.location.href = './qg-admin-panel.html';
+  } catch(e) {
+    showError(e.message || 'Could not connect to server.');
+    btn.disabled = false; btnText.textContent = 'Sign In';
+  }
+}
+
+function showError(msg) {
+  const box = document.getElementById('errorBox');
+  box.textContent = '⚠ ' + msg;
+  box.style.display = 'block';
+}
+
+// Check server on load
+checkServer();
+
+// Auto-focus username
+document.getElementById('username').focus();
+</script>
+</body>
+</html>
