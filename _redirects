@@ -1,7 +1,1 @@
-# Cloudflare Pages / Netlify redirect rules
-
-# Block direct access to old admin.html
 /admin.html  /qg-secure-login.html  302
-
-# All other routes serve index.html (SPA fallback)
-/*  /index.html  200
