@@ -354,11 +354,11 @@ const API = {
   isOk()  { return !!(this.base() && this.token()); },
   headers(auth = false) {
     const h = { 'Content-Type': 'application/json' };
-    if (auth) h['Authorization'] = `Bearer ${this.token()}`;
+    if (auth || this.token()) h['Authorization'] = `Bearer ${this.token()}`;
     return h;
   },
   async get(path) {
-    const r = await fetch(this.base() + path, { headers: this.headers() });
+    const r = await fetch(this.base() + path, { headers: this.headers(true) });
     if (r.status === 401) { redirectToLogin(); throw new Error('Unauthorized'); }
     if (!r.ok) throw new Error(`${r.status}`);
     return r.json();
