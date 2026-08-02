@@ -299,11 +299,9 @@ footer span { font-size: 12px; color: var(--text3); }
 (function () {
   const params = new URLSearchParams(location.search);
   const s = params.get('server');
-  if (s) {
-    localStorage.setItem('qg_server', s.replace(/\/$/, ''));
-    // Clean URL without reloading
-    history.replaceState({}, '', location.pathname);
-  }
+if (!localStorage.getItem('qg_server')) {
+  localStorage.setItem('qg_server', 'https://api.quickgeo.live');
+}
 })();
 
 const API = {
