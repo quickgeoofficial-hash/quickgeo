@@ -45,6 +45,10 @@ input {
   outline: none; transition: border-color 0.15s;
 }
 input:focus { border-color: var(--green); }
+.server-row { display: flex; gap: 8px; align-items: flex-end; margin-bottom: 20px; }
+.server-row .fgrp { flex: 1; margin-bottom: 0; }
+.server-edit { padding: 11px 12px; background: var(--bg); border: 1px solid var(--border2); border-radius: 9px; font-size: 12px; color: var(--text2); cursor: pointer; white-space: nowrap; font-family: 'DM Sans', sans-serif; }
+.server-edit:hover { border-color: var(--green); color: var(--green); }
 .btn {
   width: 100%; padding: 13px; background: var(--green); color: #fff; border: none;
   border-radius: 10px; font-family: 'Syne', sans-serif; font-size: 15px; font-weight: 600;
@@ -58,13 +62,9 @@ input:focus { border-color: var(--green); }
 }
 [data-theme="dark"] .error { background: rgba(226,75,74,0.12); border-color: rgba(226,75,74,0.3); }
 .theme-toggle { position: fixed; top: 16px; right: 16px; width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--border2); background: var(--surface); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 15px; }
-.server-info { font-size: 11px; color: var(--text3); margin-bottom: 20px; display: flex; align-items: center; gap: 6px; padding: 8px 10px; background: var(--bg); border-radius: 8px; border: 1px solid var(--border); }
-.server-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text3); flex-shrink: 0; transition: background 0.3s; }
-.server-dot.ok  { background: var(--green); box-shadow: 0 0 0 2px rgba(29,158,117,0.2); }
-.server-dot.err { background: var(--red); }
-.server-info span { flex: 1; }
-.server-edit { font-size: 11px; color: var(--text3); background: none; border: none; cursor: pointer; font-family: 'DM Sans', sans-serif; padding: 0; text-decoration: underline; }
-.server-edit:hover { color: var(--green); }
+.server-info { font-size: 11px; color: var(--text3); margin-bottom: 20px; display: flex; align-items: center; gap: 5px; }
+.server-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text3); flex-shrink: 0; }
+.server-dot.ok { background: var(--green); }
 </style>
 </head>
 <body>
@@ -78,8 +78,8 @@ input:focus { border-color: var(--green); }
 
   <div class="server-info">
     <div class="server-dot" id="serverDot"></div>
-    <span id="serverInfoText">Checking server…</span>
-    <button class="server-edit" onclick="changeServer()">change</button>
+    <span id="serverInfoText">No server configured</span>
+    <button class="server-edit" onclick="changeServer()">Change</button>
   </div>
 
   <div class="error" id="errorBox"></div>
@@ -101,9 +101,6 @@ input:focus { border-color: var(--green); }
 <script>
 'use strict';
 
-/* ── HARDCODED SERVER — change this if your API URL ever changes ── */
-const DEFAULT_SERVER = 'https://api.quickgeo.live';
-
 /* ── THEME ── */
 let theme = localStorage.getItem('qg_theme') ||
   (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
@@ -117,7 +114,7 @@ function applyTheme(t) {
 function toggleTheme() { applyTheme(theme === 'dark' ? 'light' : 'dark'); }
 
 /* ── SERVER CONFIG ── */
-// Auto-set server from URL param (e.g. shared link with ?server=...)
+// Check for ?server= param in URL (shared link)
 const params = new URLSearchParams(location.search);
 const urlServer = params.get('server');
 if (urlServer) {
@@ -125,15 +122,11 @@ if (urlServer) {
   history.replaceState({}, '', location.pathname);
 }
 
-// Always default to hardcoded server if nothing stored
-function getServer() {
-  const stored = localStorage.getItem('qg_server');
-  if (!stored) localStorage.setItem('qg_server', DEFAULT_SERVER);
-  return (localStorage.getItem('qg_server') || DEFAULT_SERVER).replace(/\/$/, '');
-}
+function getServer() { return (localStorage.getItem('qg_server') || '').replace(/\/$/, ''); }
 
 function changeServer() {
-  const url = prompt('Enter server URL:', getServer());
+  const url = prompt('Enter your server URL (e.g. https://api.yourdomain.com):',
+    getServer() || '');
   if (url && url.trim()) {
     localStorage.setItem('qg_server', url.trim().replace(/\/$/, ''));
     checkServer();
@@ -144,18 +137,20 @@ async function checkServer() {
   const dot  = document.getElementById('serverDot');
   const info = document.getElementById('serverInfoText');
   const srv  = getServer();
-  dot.className = 'server-dot';
+  if (!srv) {
+    dot.className = 'server-dot';
+    info.textContent = 'No server configured — click Change';
+    return;
+  }
   info.textContent = 'Checking…';
   try {
-    const r = await fetch(srv + '/health', { signal: AbortSignal.timeout(5000) });
+    const r = await fetch(srv + '/health');
     const d = await r.json();
-    if (d.status === 'ok') {
-      dot.className = 'server-dot ok';
-      info.textContent = `Connected · ${new URL(srv).hostname} · ${d.posts} post${d.posts!==1?'s':''}`;
-    } else throw new Error('bad response');
+    dot.className = 'server-dot ok';
+    info.textContent = `Connected · ${new URL(srv).hostname}`;
   } catch {
-    dot.className = 'server-dot err';
-    info.textContent = 'Cannot reach server — is Termux running?';
+    dot.className = 'server-dot';
+    info.textContent = 'Cannot reach server — is it running?';
   }
 }
 
@@ -169,6 +164,8 @@ async function login() {
   const server   = getServer();
 
   errorBox.style.display = 'none';
+
+  if (!server) { showError('No server configured. Click "Change" to set your server URL.'); return; }
   if (!username || !password) { showError('Please enter both username and password.'); return; }
 
   btn.disabled = true; btnText.textContent = 'Signing in…';
@@ -177,20 +174,19 @@ async function login() {
     const r = await fetch(server + '/api/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password }),
-      signal: AbortSignal.timeout(8000)
+      body: JSON.stringify({ username, password })
     });
     const data = await r.json();
     if (!r.ok) throw new Error(data.error || 'Login failed');
 
+    // Store session token
     sessionStorage.setItem('qg_token', data.token);
     sessionStorage.setItem('qg_server', server);
+
+    // Redirect to admin panel
     window.location.href = './qg-admin-panel.html';
   } catch(e) {
-    const msg = e.name === 'TimeoutError'
-      ? 'Server took too long to respond. Is Termux running?'
-      : (e.message || 'Could not connect to server.');
-    showError(msg);
+    showError(e.message || 'Could not connect to server.');
     btn.disabled = false; btnText.textContent = 'Sign In';
   }
 }
@@ -201,8 +197,10 @@ function showError(msg) {
   box.style.display = 'block';
 }
 
-// Init
+// Check server on load
 checkServer();
+
+// Auto-focus username
 document.getElementById('username').focus();
 </script>
 </body>
