@@ -299,9 +299,11 @@ footer span { font-size: 12px; color: var(--text3); }
 (function () {
   const params = new URLSearchParams(location.search);
   const s = params.get('server');
-if (!localStorage.getItem('qg_server')) {
-  localStorage.setItem('qg_server', 'https://api.quickgeo.live');
-}
+  if (s) {
+    localStorage.setItem('qg_server', s.replace(/\/$/, ''));
+    // Clean URL without reloading
+    history.replaceState({}, '', location.pathname);
+  }
 })();
 
 const API = {
@@ -495,6 +497,17 @@ let activePicker = null;
 
 function saveBM()     { localStorage.setItem(BM_KEY, JSON.stringify(bookmarks)); }
 function saveReacts() { localStorage.setItem(REACTS_KEY, JSON.stringify(userReacts)); }
+
+/* ── PRIORITY 5: HTML escape to prevent XSS ── */
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
 
 async function react(postId, emoji) {
   const userId = getUserId();
@@ -710,11 +723,11 @@ async function _doLoadPosts() {
         <div class="ch-avatar" aria-hidden="true">QG</div>
         <div class="ch-meta">
           <div class="ch-name">Quickgeo</div>
-          <div class="ch-time"><time>${post.date}</time> · ${post.time}</div>
+          <div class="ch-time"><time>${escapeHtml(post.date)}</time> · ${escapeHtml(post.time)}</div>
         </div>
-        <span class="tag-badge">${post.tagEmoji||''} ${post.tag}</span>
+        <span class="tag-badge">${escapeHtml(post.tagEmoji||'')} ${escapeHtml(post.tag)}</span>
       </div>
-      ${body ? `<div class="card-body">${body}</div>` : ''}
+      ${body ? `<div class="card-body">${escapeHtml(body)}</div>` : ''}
       ${didTranslate ? `<div class="tr-bar">🌐 ${t('trFrom')}</div>` : ''}
       ${mediaHTML}
       <div class="react-row" role="group">
