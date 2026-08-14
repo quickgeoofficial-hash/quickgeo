@@ -347,8 +347,9 @@ function toggleTheme() { applyTheme(currentTheme === 'dark' ? 'light' : 'dark', 
 /* ── API LAYER (session token auth) ── */
 const API = {
   base()  {
-    // Prefer sessionStorage (set by login page), fallback to localStorage
-    return (sessionStorage.getItem('qg_server') || localStorage.getItem('qg_server') || '').replace(/\/$/, '');
+    // sessionStorage only — never fall back to localStorage for server URL
+    // (avoids leaking config to browser storage longer than session)
+    return (sessionStorage.getItem('qg_server') || '').replace(/\/$/, '');
   },
   token() { return sessionStorage.getItem('qg_token') || ''; },
   isOk()  { return !!(this.base() && this.token()); },
@@ -619,6 +620,19 @@ async function publishPost() {
   }
 }
 
+/* ════════════════════════════
+   PRIORITY 5 — HTML ESCAPE (XSS prevention)
+════════════════════════════ */
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 /* ── ADMIN FEED ── */
 async function confirmDelete(id, btn) {
   if (!API.isOk()) { openServerModal(); return; }
@@ -679,10 +693,10 @@ async function renderAdminFeed() {
       card.innerHTML = `
         ${post.pinned ? '<div class="ppin-lbl">📌 Pinned</div>' : ''}
         <div class="pcard-hd">
-          <span class="ptag">${post.tagEmoji||''} ${post.tag}</span>
-          <span class="ptime">${post.date} · ${post.time}</span>
+          <span class="ptag">${escapeHtml(post.tagEmoji||'')} ${escapeHtml(post.tag)}</span>
+          <span class="ptime">${escapeHtml(post.date)} · ${escapeHtml(post.time)}</span>
         </div>
-        ${post.text ? `<div class="pbody">${post.text}</div>` : ''}
+        ${post.text ? `<div class="pbody">${escapeHtml(post.text)}</div>` : ''}
         ${mediaHTML}
         ${rxnHTML ? `<div class="preacts">${rxnHTML}</div>` : ''}
         <div class="pactions">
