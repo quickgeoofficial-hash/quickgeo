@@ -128,8 +128,49 @@ app.use((req, _, next) => {
   next();
 });
 
-/* ── SERVE UPLOADED FILES ── */
-app.use('/uploads', express.static(UPLOADS_DIR));
+/* ── SERVE UPLOADED FILES with Range Request support for video ── */
+app.use('/uploads', (req, res, next) => {
+  const filePath = path.join(UPLOADS_DIR, path.basename(req.path));
+  if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'File not found' });
+
+  const stat = fs.statSync(filePath);
+  const fileSize = stat.size;
+  const range = req.headers.range;
+
+  // Determine content type
+  const ext = path.extname(filePath).toLowerCase();
+  const mimeTypes = {
+    '.mp4': 'video/mp4', '.webm': 'video/webm', '.mov': 'video/quicktime',
+    '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png',
+    '.gif': 'image/gif', '.webp': 'image/webp'
+  };
+  const contentType = mimeTypes[ext] || 'application/octet-stream';
+
+  if (range) {
+    // Parse range header: "bytes=start-end"
+    const parts  = range.replace(/bytes=/, '').split('-');
+    const start  = parseInt(parts[0], 10);
+    const end    = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+    const chunkSize = end - start + 1;
+
+    res.writeHead(206, {
+      'Content-Range'  : `bytes ${start}-${end}/${fileSize}`,
+      'Accept-Ranges'  : 'bytes',
+      'Content-Length' : chunkSize,
+      'Content-Type'   : contentType,
+      'Cache-Control'  : 'public, max-age=86400'
+    });
+    fs.createReadStream(filePath, { start, end }).pipe(res);
+  } else {
+    res.writeHead(200, {
+      'Content-Length' : fileSize,
+      'Content-Type'   : contentType,
+      'Accept-Ranges'  : 'bytes',
+      'Cache-Control'  : 'public, max-age=86400'
+    });
+    fs.createReadStream(filePath).pipe(res);
+  }
+});
 
 /* ── AUTH ── */
 function adminOnly(req, res, next) {
