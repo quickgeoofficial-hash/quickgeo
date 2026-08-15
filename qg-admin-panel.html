@@ -507,7 +507,7 @@ function updateCharCount() {
 
 /* ── MEDIA TABS ── */
 let activeTab = 'text';
-let uploadedFiles = [];
+let uploadedFiles = []; // now stores {url, type, filename} — server URLs, not base64
 let selectedGif = null;
 
 function switchTab(tab) {
@@ -528,18 +528,64 @@ dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag'));
 dropZone.addEventListener('drop',      e => { e.preventDefault(); dropZone.classList.remove('drag'); handleFiles(e.dataTransfer.files); });
 dropZone.addEventListener('keydown',   e => { if(e.key==='Enter'||e.key===' ') fileInput.click(); });
 
-function handleFiles(files) {
-  Array.from(files).forEach(file => {
-    if (file.size > 50 * 1024 * 1024) { showToast(`"${file.name}" is too large (max 50 MB)`, 'err'); return; }
-    const reader = new FileReader();
-    reader.onload = ev => {
-      const obj = { url: ev.target.result, type: file.type || '' };
-      uploadedFiles.push(obj);
-      renderPreview(obj, uploadedFiles.length - 1);
-    };
-    reader.readAsDataURL(file);
-  });
+/* ── P8: Upload file to server, get back a URL ── */
+async function handleFiles(files) {
+  for (const file of Array.from(files)) {
+    if (file.size > 200 * 1024 * 1024) {
+      showToast(`"${file.name}" is too large (max 200 MB)`, 'err');
+      continue;
+    }
+
+    // Show uploading placeholder
+    const idx = uploadedFiles.length;
+    uploadedFiles.push(null); // reserve slot
+    const wrap = document.createElement('div');
+    wrap.className = 'prev-item'; wrap.id = 'prev-' + idx;
+    wrap.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;font-size:12px;color:var(--text3);flex-direction:column;gap:4px"><div id="uprog-${idx}">⏳ 0%</div><div style="font-size:10px">uploading…</div></div>`;
+    prevGrid.appendChild(wrap);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      // Use XMLHttpRequest for upload progress
+      const result = await new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', API.base() + '/api/upload');
+        xhr.setRequestHeader('Authorization', `Bearer ${API.token()}`);
+        xhr.upload.onprogress = e => {
+          if (e.lengthComputable) {
+            const pct = Math.round((e.loaded / e.total) * 100);
+            const el = document.getElementById('uprog-' + idx);
+            if (el) el.textContent = `⏳ ${pct}%`;
+          }
+        };
+        xhr.onload = () => {
+          if (xhr.status === 200 || xhr.status === 201) resolve(JSON.parse(xhr.responseText));
+          else reject(new Error(`Upload failed: ${xhr.status}`));
+        };
+        xhr.onerror = () => reject(new Error('Network error during upload'));
+        xhr.send(formData);
+      });
+
+      // Store the server URL (not base64!)
+      uploadedFiles[idx] = { url: result.url, type: result.type, filename: result.filename };
+
+      // Replace placeholder with actual preview
+      const isVid = result.type.startsWith('video');
+      wrap.innerHTML = isVid
+        ? `<video src="${result.url}" muted></video><button class="prev-rm" onclick="removeFile(${idx})">✕</button>`
+        : `<img src="${result.url}" alt=""><button class="prev-rm" onclick="removeFile(${idx})">✕</button>`;
+
+      showToast(`✓ ${file.name} uploaded!`);
+    } catch(e) {
+      uploadedFiles[idx] = null;
+      wrap.remove();
+      showToast(`❌ ${file.name}: ${e.message}`, 'err');
+    }
+  }
 }
+
 function renderPreview(obj, idx) {
   const wrap = document.createElement('div');
   wrap.className = 'prev-item'; wrap.id = 'prev-' + idx;
@@ -549,6 +595,7 @@ function renderPreview(obj, idx) {
     : `<img src="${obj.url}" alt=""><button class="prev-rm" onclick="removeFile(${idx})">✕</button>`;
   prevGrid.appendChild(wrap);
 }
+
 function removeFile(idx) {
   uploadedFiles[idx] = null;
   const el = document.getElementById('prev-' + idx);
@@ -581,12 +628,12 @@ function searchGifs() {
 
 /* ── PUBLISH ── */
 async function publishPost() {
-  if (!API.isOk()) { openServerModal(); showToast('Connect to server first', 'err'); return; }
+  if (!API.isOk()) { showToast('Not connected to server', 'err'); return; }
 
-  const text = document.getElementById('postText').value.trim();
+  const text   = document.getElementById('postText').value.trim();
   const tagVal = document.getElementById('catSelect').value;
-  const cats = await fetchCatsAPI();
-  const cat = cats.find(c => c.name === tagVal) || { emoji: '📌', name: tagVal || 'Update' };
+  const cats   = await fetchCatsAPI();
+  const cat    = cats.find(c => c.name === tagVal) || { emoji: '📌', name: tagVal || 'Update' };
 
   if (!text && activeTab === 'text') {
     const ta = document.getElementById('postText');
@@ -595,16 +642,25 @@ async function publishPost() {
     return;
   }
 
+  // Check if any files are still uploading
+  const pendingUploads = uploadedFiles.some((f, i) =>
+    f === null && document.getElementById('prev-' + i) !== null
+  );
+  if (pendingUploads) { showToast('⏳ Wait for uploads to finish', 'err'); return; }
+
+  // P8: media now contains server URLs, not base64
   const media = [];
-  if (activeTab === 'image') uploadedFiles.filter(Boolean).forEach(f => media.push({ url: f.url, type: f.type || '' }));
-  else if (activeTab === 'gif' && selectedGif) media.push({ url: selectedGif, type: 'gif' });
+  if (activeTab === 'image') {
+    uploadedFiles.filter(Boolean).forEach(f => media.push({ url: f.url, type: f.type || '' }));
+  } else if (activeTab === 'gif' && selectedGif) {
+    media.push({ url: selectedGif, type: 'gif' });
+  }
 
   const btn = document.getElementById('pubBtn');
   btn.disabled = true; btn.textContent = 'Publishing…';
 
   try {
     await API.post('/api/posts', { tag: cat.name, tagEmoji: cat.emoji, text, media }, true);
-    // Reset
     document.getElementById('postText').value = '';
     updateCharCount();
     prevGrid.innerHTML = '';
@@ -613,7 +669,7 @@ async function publishPost() {
     document.getElementById('gifQuery').value = '';
     showToast('✓ Post published!');
     renderAdminFeed();
-  } catch (e) {
+  } catch(e) {
     showToast(`❌ Failed: ${e.message}`, 'err');
   } finally {
     btn.disabled = false; btn.textContent = 'Publish Post →';
