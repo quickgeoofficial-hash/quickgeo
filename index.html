@@ -638,7 +638,16 @@ async function _doLoadPosts() {
   try {
     if (API.isConfigured()) {
       posts = await API.get('/api/posts');
-      localStorage.setItem(CACHE_POSTS, JSON.stringify(posts));
+      // P8: Strip base64 data URLs before caching (they overflow 5MB localStorage limit)
+      const cacheSafe = posts.map(p => ({
+        ...p,
+        media: (p.media || []).map(m => ({
+          ...m,
+          url: (m.url && m.url.startsWith('data:')) ? '' : m.url
+        })).filter(m => m.url)
+      }));
+      try { localStorage.setItem(CACHE_POSTS, JSON.stringify(cacheSafe)); }
+      catch(e) { console.warn('Cache full, skipping localStorage:', e.message); }
     } else {
       posts = getCachedPosts();
       fromCache = true;
