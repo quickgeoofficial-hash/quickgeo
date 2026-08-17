@@ -404,8 +404,8 @@ function openServerModal() {
     const urlEl  = document.getElementById('serverUrlIn');
     const resEl  = document.getElementById('serverTestResult');
     const modal  = document.getElementById('serverModal');
-    if (!modal) { alert('Modal not found — please re-upload admin.html'); return; }
-    if (urlEl)  urlEl.value  = localStorage.getItem('qg_server') || '';
+    if (!modal) { alert('Admin panel UI is unavailable. Please reload the page.'); return; }
+    if (urlEl)  urlEl.value  = sessionStorage.getItem('qg_server') || '';
     if (resEl)  resEl.textContent = '';
     updateShareableLink();
     modal.style.display = 'flex';
@@ -432,7 +432,7 @@ async function saveServerConfig() {
     const d = await r.json();
     if (d.status !== 'ok') throw new Error('Bad response');
 
-    localStorage.setItem('qg_server', url);
+    sessionStorage.setItem('qg_server', url);
     res.textContent = `✅ Connected! Server has ${d.posts} post${d.posts!==1?'s':''}.`;
     res.style.color = 'var(--green)';
     updateConnStatus(true);
@@ -446,10 +446,10 @@ async function saveServerConfig() {
 }
 
 function updateShareableLink() {
-  const server = localStorage.getItem('qg_server') || '';
+  const server = sessionStorage.getItem('qg_server') || '';
   const el = document.getElementById('shareableLinkText');
   if (el) el.textContent = server
-    ? `${location.origin}${location.pathname.replace('admin.html','index.html')}?server=${encodeURIComponent(server)}`
+    ? `${location.origin}${location.pathname.replace('qg-admin-panel.html','index.html')}?server=${encodeURIComponent(server)}`
     : 'Configure server URL first';
 }
 
