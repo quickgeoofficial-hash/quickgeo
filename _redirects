@@ -1,10 +1,10 @@
-# Block all old/guessable admin paths → login page
-/admin          /qg-secure-login.html  302
-/admin.html     /qg-secure-login.html  302
-/admin-panel    /qg-secure-login.html  302
-/dashboard      /qg-secure-login.html  302
-/panel          /qg-secure-login.html  302
-/login          /qg-secure-login.html  302
+# Block guessable admin paths → login page
+/admin              /qg-secure-login.html  302
+/admin.html         /qg-secure-login.html  302
+/admin-panel        /qg-secure-login.html  302
+/dashboard          /qg-secure-login.html  302
+/panel              /qg-secure-login.html  302
+/login              /qg-secure-login.html  302
 
-# Block direct access to admin panel without login context
-/qg-admin-panel.html  /qg-secure-login.html  302
+# NOTE: qg-admin-panel.html is NOT blocked here
+# It is protected by session token check inside the page itself
