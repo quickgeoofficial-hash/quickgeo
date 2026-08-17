@@ -187,9 +187,7 @@ async function login() {
 
     sessionStorage.setItem('qg_token', data.token);
     sessionStorage.setItem('qg_server', server);
-    window.location.href = _destination
-      ? `./qg-admin-panel.html#${_destination}`
-      : './qg-admin-panel.html';
+    window.location.href = './qg-admin-panel.html' + requestedPanel;
   } catch(e) {
     const msg = e.name === 'TimeoutError'
       ? 'Server took too long to respond. Is Termux running?'
@@ -206,11 +204,12 @@ function showError(msg) {
 }
 
 // Init
-// Capture hash at page load into JS memory only — never stored anywhere.
-// Only whitelisted destinations are accepted; everything else falls back to default.
-const ALLOWED_DESTINATIONS = ['compose', 'categories'];
-const _rawHash = location.hash.replace('#', '').toLowerCase();
-const _destination = ALLOWED_DESTINATIONS.includes(_rawHash) ? _rawHash : '';
+// Capture and validate hash at page load into JS memory only — never stored anywhere.
+// Only '#compose' and '#categories' are permitted; all other hashes are rejected.
+const requestedPanel =
+  location.hash === '#compose' || location.hash === '#categories'
+    ? location.hash
+    : '';
 
 checkServer();
 document.getElementById('username').focus();
