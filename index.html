@@ -3,13 +3,16 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Quickgeo — Geospatial News Channel</title>
-<meta name="description" content="Quickgeo is a live geospatial news channel delivering the latest updates on maps, satellites, GIS, and location technology.">
+<title>Quickgeo — Geopolitics News Channel</title>
+<meta name="description" content="Quickgeo is a live geopolitics news channel delivering the latest updates on global politics, international relations, and world affairs.">
 <meta name="robots" content="index, follow">
 <meta name="theme-color" content="#1D9E75">
-<meta property="og:title" content="Quickgeo — Geospatial News">
-<meta property="og:description" content="Live updates on maps, satellites, GIS, and geospatial technology.">
+<meta property="og:title" content="Quickgeo — Geopolitics News">
+<meta property="og:description" content="Live geopolitics updates — global politics, international relations, world affairs.">
 <meta property="og:type" content="website">
+<meta property="og:image" content="logo.png">
+<link rel="icon" type="image/png" href="submark.png">
+<link rel="apple-touch-icon" href="submark.png">
 <link rel="manifest" href="manifest.json">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -43,7 +46,8 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 /* ── TOPBAR ── */
 .topbar { background: var(--surface); border-bottom: 1px solid var(--border); box-shadow: var(--shadow); padding: 0 16px; height: 56px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 200; flex-shrink: 0; }
 .logo { font-family: 'Syne', sans-serif; font-size: 18px; font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 7px; text-decoration: none; }
-.logo-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); animation: pulse 2.5s infinite; flex-shrink: 0; }
+.logo-dot { display: none; } /* replaced by submark image */
+  .logo-img { width: 28px; height: 28px; object-fit: contain; flex-shrink: 0; }
 @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.4;transform:scale(1.5)} }
 .live-badge { font-size: 10px; font-weight: 600; background: var(--red-bg); color: var(--red-text); border-radius: 20px; padding: 2px 8px; letter-spacing: 0.05em; }
 .topbar-right { display: flex; align-items: center; gap: 7px; }
@@ -192,7 +196,7 @@ footer span { font-size: 12px; color: var(--text3); }
 <!-- Topbar -->
 <header class="topbar">
   <a class="logo" href="#" aria-label="Quickgeo home">
-    <div class="logo-dot"></div> Quickgeo
+    <div class="logo-dot"></div><img src="submark.png" alt="Quickgeo" class="logo-img"> Quickgeo
     <span class="live-badge" aria-label="Live">● LIVE</span>
   </a>
   <nav class="topbar-right" aria-label="Site controls">
