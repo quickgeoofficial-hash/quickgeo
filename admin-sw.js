@@ -1,9 +1,11 @@
-/* Quickgeo Admin — Service Worker v2 */
-const CACHE = 'qg-admin-v2';
+/* Quickgeo Admin — Service Worker v3 */
+const CACHE = 'qg-admin-v3';
 
-// Only cache these static assets on install
+// Only cache static admin shell files that actually exist
 const STATIC_ASSETS = [
-  './admin.html'
+  './qg-secure-login.html',
+  './qg-admin-panel.html',
+  './admin-manifest.json'
 ];
 
 self.addEventListener('install', e => {
@@ -30,16 +32,16 @@ self.addEventListener('fetch', e => {
 
   // NEVER intercept these — always go straight to network
   if (
-    url.includes('trycloudflare.com') ||  // your phone server
+    url.includes('trycloudflare.com') ||  // phone server (API + uploads)
     url.includes('cloudflare.com') ||
     url.includes('giphy.com') ||
     url.includes('translate.googleapis.com') ||
     url.includes('googlesyndication') ||
     url.includes('doubleclick.net') ||
     url.includes('netlify') ||
-    e.request.method !== 'GET'
+    e.request.method !== 'GET'            // POST/DELETE/PATCH go direct
   ) {
-    return; // let browser handle it normally
+    return;
   }
 
   // For everything else: network first, fall back to cache
