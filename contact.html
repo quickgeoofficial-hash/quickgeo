@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Contact — Quickgeo</title>
+<link rel="icon" type="image/png" href="submark.png">
+<link rel="apple-touch-icon" href="submark.png">
 <meta name="description" content="Contact Quickgeo — get in touch with our team.">
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
 <style>
@@ -20,34 +22,93 @@
   input, textarea { width: 100%; padding: 10px 12px; border: 1px solid rgba(0,0,0,0.15); border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 14px; background: #fff; color: #1a1a18; outline: none; }
   input:focus, textarea:focus { border-color: #1D9E75; }
   textarea { min-height: 110px; resize: vertical; }
-  button[type=submit] { padding: 11px 28px; background: #1D9E75; color: #fff; border: none; border-radius: 9px; font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 600; cursor: pointer; }
+  button[type=submit] { padding: 11px 28px; background: #1D9E75; color: #fff; border: none; border-radius: 9px; font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px; }
   button[type=submit]:hover { background: #0F6E56; }
-  .sent { font-size: 14px; color: #1D9E75; font-weight: 500; display: none; margin-top: 12px; }
+  button[type=submit]:disabled { opacity: 0.6; cursor: not-allowed; }
+  .sent { font-size: 14px; color: #1D9E75; font-weight: 500; display: none; margin-top: 12px; background: #E1F5EE; padding: 10px 14px; border-radius: 8px; }
+  .error { font-size: 14px; color: #e24b4a; font-weight: 500; display: none; margin-top: 12px; background: #fff0f0; padding: 10px 14px; border-radius: 8px; }
+  input[type=text][name=_gotcha] { position: absolute; left: -9999px; }
 </style>
 </head>
 <body>
 <div class="topbar">
-  <a href="index.html">Quickgeo</a>
+  <a href="index.html" style="display:flex;align-items:center;gap:8px;"><img src="submark.png" alt="" style="width:24px;height:24px;object-fit:contain;">Quickgeo</a>
   <span style="color:#96968e;font-size:13px">/ Contact</span>
 </div>
 <div class="content">
   <h1>Contact Us</h1>
   <p>Have a news tip, spotted an error, or just want to say hello? Fill in the form below and we'll get back to you.</p>
-  <form onsubmit="handleSubmit(event)">
-    <div class="fgrp"><label for="name">Your Name</label><input id="name" type="text" placeholder="Jane Smith" required></div>
-    <div class="fgrp"><label for="email">Email Address</label><input id="email" type="email" placeholder="jane@example.com" required></div>
-    <div class="fgrp"><label for="msg">Message</label><textarea id="msg" placeholder="Write your message here…" required></textarea></div>
-    <button type="submit">Send Message</button>
+
+  <!--
+    ⚠ SETUP REQUIRED (one-time, 3 minutes):
+    1. Go to https://formspree.io and sign up free with quickgeoofficial@gmail.com
+    2. Create a new form → it gives you an endpoint like:
+       https://formspree.io/f/xxxxabcd
+    3. Replace YOUR_FORM_ID below with that ID
+    4. Formspree will send every submission straight to your inbox
+  -->
+  <form id="contactForm" action="https://formspree.io/f/YOUR_FORM_ID" method="POST">
+    <div class="fgrp">
+      <label for="name">Your Name</label>
+      <input id="name" name="name" type="text" placeholder="Jane Smith" required>
+    </div>
+    <div class="fgrp">
+      <label for="email">Email Address</label>
+      <input id="email" name="email" type="email" placeholder="jane@example.com" required>
+    </div>
+    <div class="fgrp">
+      <label for="msg">Message</label>
+      <textarea id="msg" name="message" placeholder="Write your message here…" required></textarea>
+    </div>
+    <!-- honeypot spam trap — hidden from real users -->
+    <input type="text" name="_gotcha" style="display:none">
+    <!-- redirect Formspree back to a thank-you state instead of leaving the site -->
+    <input type="hidden" name="_subject" value="New Quickgeo contact form message">
+
+    <button type="submit" id="submitBtn">
+      <span id="btnText">Send Message</span>
+    </button>
     <div class="sent" id="sentMsg">✓ Message sent! We'll be in touch soon.</div>
+    <div class="error" id="errorMsg">⚠ Something went wrong. Please try again or email us directly.</div>
   </form>
 </div>
+
 <script>
-function handleSubmit(e) {
+const form = document.getElementById('contactForm');
+const btn = document.getElementById('submitBtn');
+const btnText = document.getElementById('btnText');
+const sentMsg = document.getElementById('sentMsg');
+const errorMsg = document.getElementById('errorMsg');
+
+form.addEventListener('submit', async function(e) {
   e.preventDefault();
-  document.getElementById('sentMsg').style.display = 'block';
-  e.target.reset();
-  setTimeout(() => { document.getElementById('sentMsg').style.display = 'none'; }, 4000);
-}
+  sentMsg.style.display = 'none';
+  errorMsg.style.display = 'none';
+  btn.disabled = true;
+  btnText.textContent = 'Sending…';
+
+  try {
+    const formData = new FormData(form);
+    const response = await fetch(form.action, {
+      method: 'POST',
+      body: formData,
+      headers: { 'Accept': 'application/json' }
+    });
+
+    if (response.ok) {
+      sentMsg.style.display = 'block';
+      form.reset();
+      setTimeout(() => { sentMsg.style.display = 'none'; }, 5000);
+    } else {
+      throw new Error('Form submission failed');
+    }
+  } catch (err) {
+    errorMsg.style.display = 'block';
+  } finally {
+    btn.disabled = false;
+    btnText.textContent = 'Send Message';
+  }
+});
 </script>
 </body>
 </html>
