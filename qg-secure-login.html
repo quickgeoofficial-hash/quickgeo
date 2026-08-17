@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Quickgeo — Sign In</title>
 <meta name="robots" content="noindex, nofollow">
+<link rel="icon" type="image/png" href="submark.png">
+<link rel="apple-touch-icon" href="submark.png">
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -33,7 +35,7 @@ body {
   width: 100%; max-width: 380px;
 }
 .logo { display: flex; align-items: center; gap: 8px; margin-bottom: 28px; }
-.logo-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--green); }
+.logo-img { width: 28px; height: 28px; object-fit: contain; }
 .logo-text { font-family: 'Syne', sans-serif; font-size: 20px; font-weight: 700; }
 h1 { font-family: 'Syne', sans-serif; font-size: 22px; font-weight: 700; margin-bottom: 6px; }
 .sub { font-size: 13px; color: var(--text2); margin-bottom: 28px; }
@@ -72,7 +74,7 @@ input:focus { border-color: var(--green); }
 <button class="theme-toggle" id="themeBtn" onclick="toggleTheme()">🌙</button>
 
 <div class="card">
-  <div class="logo"><div class="logo-dot"></div><span class="logo-text">Quickgeo</span></div>
+  <div class="logo"><img src="submark.png" alt="Quickgeo" class="logo-img"><span class="logo-text">Quickgeo</span></div>
   <h1>Admin Sign In</h1>
   <p class="sub">Enter your credentials to access the admin panel.</p>
 
