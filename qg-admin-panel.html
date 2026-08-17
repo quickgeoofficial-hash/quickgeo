@@ -195,15 +195,11 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 <!-- SERVER SETUP MODAL -->
 <div class="modal-overlay" id="serverModal" style="display:none">
   <div class="modal-box">
-    <h3>🔌 Connect to your Server</h3>
-    <p>Paste your Cloudflare tunnel URL and admin password from Termux below.</p>
+    <h3>🔌 Server Connection</h3>
+    <p>Update your Cloudflare tunnel URL if it has changed. Authentication uses your existing session token.</p>
     <div class="fgrp" style="margin-bottom:12px">
       <label for="serverUrlIn">Tunnel URL</label>
       <input class="finput" id="serverUrlIn" type="url" placeholder="https://xxxx.trycloudflare.com">
-    </div>
-    <div class="fgrp">
-      <label for="serverPassIn">Admin Password</label>
-      <input class="finput" id="serverPassIn" type="password" placeholder="Your admin password from config.json">
     </div>
     <div class="modal-actions">
       <button class="btn-secondary" onclick="closeServerModal()">Cancel</button>
@@ -406,12 +402,10 @@ async function logout() {
 function openServerModal() {
   try {
     const urlEl  = document.getElementById('serverUrlIn');
-    const passEl = document.getElementById('serverPassIn');
     const resEl  = document.getElementById('serverTestResult');
     const modal  = document.getElementById('serverModal');
     if (!modal) { alert('Modal not found — please re-upload admin.html'); return; }
     if (urlEl)  urlEl.value  = localStorage.getItem('qg_server') || '';
-    if (passEl) passEl.value = localStorage.getItem('qg_admin_pass') || '';
     if (resEl)  resEl.textContent = '';
     updateShareableLink();
     modal.style.display = 'flex';
@@ -427,10 +421,9 @@ function closeServerModal() {
 }
 
 async function saveServerConfig() {
-  const url  = document.getElementById('serverUrlIn').value.trim().replace(/\/$/, '');
-  const pass = document.getElementById('serverPassIn').value.trim();
-  const res  = document.getElementById('serverTestResult');
-  if (!url || !pass) { res.textContent = '⚠ Please fill in both fields.'; res.style.color = 'var(--amber)'; return; }
+  const url = document.getElementById('serverUrlIn').value.trim().replace(/\/$/, '');
+  const res = document.getElementById('serverTestResult');
+  if (!url) { res.textContent = '⚠ Please enter the server URL.'; res.style.color = 'var(--amber)'; return; }
 
   res.textContent = '🔄 Testing connection…'; res.style.color = 'var(--text3)';
 
@@ -440,7 +433,6 @@ async function saveServerConfig() {
     if (d.status !== 'ok') throw new Error('Bad response');
 
     localStorage.setItem('qg_server', url);
-    localStorage.setItem('qg_admin_pass', pass);
     res.textContent = `✅ Connected! Server has ${d.posts} post${d.posts!==1?'s':''}.`;
     res.style.color = 'var(--green)';
     updateConnStatus(true);
