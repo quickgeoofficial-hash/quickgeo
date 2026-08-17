@@ -1,25 +1,25 @@
 {
   "name": "Quickgeo",
   "short_name": "Quickgeo",
-  "description": "Live geospatial news — maps, satellites, GIS, and location tech.",
+  "description": "Live geopolitics news — global politics, international relations, and world affairs.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "any",
-  "background_color": "#f4f5f0",
+  "background_color": "#111110",
   "theme_color": "#1D9E75",
   "categories": ["news"],
   "icons": [
     {
-      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='80' fill='%231D9E75'/%3E%3Ctext x='256' y='340' font-size='300' text-anchor='middle' font-family='system-ui,sans-serif' fill='white'%3E%F0%9F%97%BA%3C/text%3E%3C/svg%3E",
-      "sizes": "any",
-      "type": "image/svg+xml",
+      "src": "submark.png",
+      "sizes": "192x192",
+      "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' fill='%231D9E75'/%3E%3Ctext x='256' y='340' font-size='300' text-anchor='middle' font-family='system-ui,sans-serif' fill='white'%3E%F0%9F%97%BA%3C/text%3E%3C/svg%3E",
-      "sizes": "any",
-      "type": "image/svg+xml",
+      "src": "submark.png",
+      "sizes": "512x512",
+      "type": "image/png",
       "purpose": "maskable"
     }
   ],
