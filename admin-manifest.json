@@ -1,25 +1,25 @@
 {
   "name": "Quickgeo Admin",
   "short_name": "QG Admin",
-  "description": "Quickgeo news channel admin panel — post, manage categories, pin updates.",
-  "start_url": "./admin.html",
+  "description": "Quickgeo admin panel — post and manage geopolitics news updates.",
+  "start_url": "./qg-secure-login.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "any",
-  "background_color": "#1D9E75",
+  "background_color": "#111110",
   "theme_color": "#1D9E75",
   "categories": ["news", "productivity"],
   "icons": [
     {
-      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='80' fill='%231D9E75'/%3E%3Ctext x='256' y='340' font-size='300' text-anchor='middle' font-family='system-ui,sans-serif' fill='white'%3E%F0%9F%97%BA%3C/text%3E%3C/svg%3E",
-      "sizes": "any",
-      "type": "image/svg+xml",
+      "src": "submark.png",
+      "sizes": "192x192",
+      "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' fill='%231D9E75'/%3E%3Ctext x='256' y='340' font-size='300' text-anchor='middle' font-family='system-ui,sans-serif' fill='white'%3E%F0%9F%97%BA%3C/text%3E%3C/svg%3E",
-      "sizes": "any",
-      "type": "image/svg+xml",
+      "src": "submark.png",
+      "sizes": "512x512",
+      "type": "image/png",
       "purpose": "maskable"
     }
   ],
@@ -27,14 +27,12 @@
     {
       "name": "New Post",
       "short_name": "Post",
-      "description": "Compose a new news post",
-      "url": "./admin.html#compose"
+      "url": "./qg-secure-login.html#compose"
     },
     {
       "name": "Categories",
       "short_name": "Categories",
-      "description": "Manage categories",
-      "url": "./admin.html#categories"
+      "url": "./qg-secure-login.html#categories"
     }
   ],
   "prefer_related_applications": false
