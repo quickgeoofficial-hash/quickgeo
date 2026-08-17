@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Quickgeo — Admin</title>
 <link rel="manifest" href="admin-manifest.json">
+<link rel="icon" type="image/png" href="submark.png">
+<link rel="apple-touch-icon" href="submark.png">
 <meta name="theme-color" content="#1D9E75">
 <meta name="robots" content="noindex, nofollow">
 <meta name="mobile-web-app-capable" content="yes">
@@ -38,8 +40,8 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 
 /* TOPBAR */
 .topbar { background: var(--surface); border-bottom: 1px solid var(--border); box-shadow: var(--shadow); padding: 0 20px; height: 56px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
-.logo { font-family: 'Syne', sans-serif; font-size: 18px; font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 7px; }
-.logo-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); }
+.logo { font-family: 'Syne', sans-serif; font-size: 18px; font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 8px; }
+.logo-img { width: 28px; height: 28px; object-fit: contain; }
 .admin-badge { font-size: 11px; font-weight: 500; background: var(--amber-light); color: #856404; border: 1px solid var(--amber-border); border-radius: 20px; padding: 3px 10px; }
 [data-theme="dark"] .admin-badge { color: var(--amber); }
 .topbar-right { display: flex; align-items: center; gap: 8px; }
@@ -221,7 +223,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 </div>
 
 <header class="topbar">
-  <div class="logo"><div class="logo-dot"></div> Quickgeo</div>
+  <div class="logo"><img src="submark.png" alt="Quickgeo" class="logo-img"> Quickgeo</div>
   <div class="topbar-right">
     <span class="admin-badge">⚙ Admin</span>
     <button class="conn-status" id="connStatus" onclick="openServerModal()" title="Server connection settings">
