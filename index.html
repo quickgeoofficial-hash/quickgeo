@@ -515,6 +515,19 @@ function escapeHtml(str) {
     .replace(/'/g, '&#039;');
 }
 
+/* ── MEDIA URL PROTOCOL VALIDATION (issue 1) ── */
+// Only allow http: and https: — reject javascript:, data:, vbscript:, blob:, etc.
+function safeMediaUrl(url) {
+  if (!url || typeof url !== 'string') return null;
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol === 'https:' || parsed.protocol === 'http:') return url;
+    return null; // reject any other protocol
+  } catch {
+    return null; // unparseable — reject
+  }
+}
+
 async function react(postId, emoji) {
   const userId = getUserId();
   const key = `${postId}_${emoji}`;
@@ -577,7 +590,15 @@ function sharePost(postId) {
   }
 }
 
-/* Emoji picker */
+/* ── REACTION EVENT DELEGATION (replaces inline onclick on r-btn) ── */
+document.addEventListener('click', e => {
+  const btn = e.target.closest('.r-btn[data-pid][data-emoji]');
+  if (btn) {
+    const pid   = Number(btn.dataset.pid);
+    const emoji = btn.dataset.emoji;
+    if (pid && emoji) react(pid, emoji);
+  }
+});
 function openPicker(postId) {
   closePicker();
   const slot = document.getElementById('ps-' + postId);
@@ -692,7 +713,7 @@ async function _doLoadPosts() {
   renderCatPills(cats, getCachedPosts());
 
   if (!posts.length) {
-    const msg = catQuery ? `${t('noResult')} "<strong>${catQuery}</strong>"` : t('nopost');
+    const msg = catQuery ? `${t('noResult')} "<strong>${escapeHtml(catQuery)}</strong>"` : t('nopost');
     feed.innerHTML = `<div class="empty-state"><div class="e-icon">${catQuery?'🔍':'📡'}</div><p>${msg}</p></div>`;
     return;
   }
@@ -715,9 +736,11 @@ async function _doLoadPosts() {
 
     const mediaHTML = (post.media || []).map(m => {
       const mt = m.type || '';
-      if (mt === 'gif')           return `<div class="media-wrap"><img class="card-gif" src="${m.url}" alt="GIF" loading="lazy"></div>`;
-      if (mt.startsWith('image')) return `<div class="media-wrap"><img class="card-img" src="${m.url}" alt="" loading="lazy"></div>`;
-      if (mt.startsWith('video')) return `<div class="media-wrap"><video class="card-video" src="${m.url}" controls preload="metadata" playsinline webkit-playsinline></video></div>`;
+      const safeUrl = safeMediaUrl(m.url);
+      if (!safeUrl) return '';
+      if (mt === 'gif')           return `<div class="media-wrap"><img class="card-gif" src="${escapeHtml(safeUrl)}" alt="GIF" loading="lazy"></div>`;
+      if (mt.startsWith('image')) return `<div class="media-wrap"><img class="card-img" src="${escapeHtml(safeUrl)}" alt="" loading="lazy"></div>`;
+      if (mt.startsWith('video')) return `<div class="media-wrap"><video class="card-video" src="${escapeHtml(safeUrl)}" controls preload="metadata" playsinline webkit-playsinline></video></div>`;
       return '';
     }).join('');
 
@@ -726,7 +749,7 @@ async function _doLoadPosts() {
       .filter(([, n]) => n > 0)
       .map(([e, n]) => {
         const on = !!userReacts[`${post.id}_${e}`];
-        return `<button type="button" class="r-btn${on?' on':''}" onclick="react(${post.id},'${e}')" aria-label="React ${e}"><span>${e}</span><span class="n">${n}</span></button>`;
+        return `<button type="button" class="r-btn${on?' on':''}" data-pid="${post.id}" data-emoji="${escapeHtml(e)}" aria-label="React ${escapeHtml(e)}"><span>${escapeHtml(e)}</span><span class="n">${n}</span></button>`;
       }).join('');
 
     const card = document.createElement('article');
