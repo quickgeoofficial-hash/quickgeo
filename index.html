@@ -599,6 +599,18 @@ document.addEventListener('click', e => {
     if (pid && emoji) react(pid, emoji);
   }
 });
+
+/* ── POST ACTION EVENT DELEGATION (picker / bookmark / share) ── */
+document.addEventListener('click', e => {
+  const btn = e.target.closest('[data-action][data-pid]');
+  if (!btn) return;
+  const pid = Number(btn.dataset.pid);
+  if (!pid) return;                   // reject non-numeric or zero
+  const action = btn.dataset.action;
+  if (action === 'picker')   openPicker(pid);
+  else if (action === 'bookmark') toggleBM(pid);
+  else if (action === 'share')    sharePost(pid);
+});
 function openPicker(postId) {
   closePicker();
   const slot = document.getElementById('ps-' + postId);
@@ -770,12 +782,12 @@ async function _doLoadPosts() {
       ${mediaHTML}
       <div class="react-row" role="group">
         ${rxnHTML}
-        <button type="button" class="r-add" onclick="openPicker(${post.id})">${t('addR')}</button>
+        <button type="button" class="r-add" data-action="picker" data-pid="${post.id}">${t('addR')}</button>
       </div>
       <div id="ps-${post.id}"></div>
       <div class="act-row">
-        <button type="button" class="act-btn${bm?' saved':''}" onclick="toggleBM(${post.id})">${bm?t('saved'):t('save')}</button>
-        <button type="button" class="act-btn" id="s-${post.id}" onclick="sharePost(${post.id})">${t('share')}</button>
+        <button type="button" class="act-btn${bm?' saved':''}" data-action="bookmark" data-pid="${post.id}">${bm?t('saved'):t('save')}</button>
+        <button type="button" class="act-btn" id="s-${post.id}" data-action="share" data-pid="${post.id}">${t('share')}</button>
       </div>`;
     feed.appendChild(card);
   });
