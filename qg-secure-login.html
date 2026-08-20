@@ -123,7 +123,7 @@ function toggleTheme() { applyTheme(theme === 'dark' ? 'light' : 'dark'); }
 const params = new URLSearchParams(location.search);
 const urlServer = params.get('server');
 if (urlServer) {
-  localStorage.setItem('qg_server', urlServer.replace(/\/$/, ''));
+  sessionStorage.setItem('qg_server', urlServer.replace(/\/$/, ''));
   history.replaceState({}, '', location.pathname);
 }
 
@@ -137,7 +137,7 @@ function getServer() {
 function changeServer() {
   const url = prompt('Enter server URL:', getServer());
   if (url && url.trim()) {
-    localStorage.setItem('qg_server', url.trim().replace(/\/$/, ''));
+    sessionStorage.setItem('qg_server', url.trim().replace(/\/$/, ''));
     checkServer();
   }
 }
