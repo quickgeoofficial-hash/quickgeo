@@ -565,11 +565,17 @@ async function handleFiles(files) {
       // Store the server URL (not base64!)
       uploadedFiles[idx] = { url: result.url, type: result.type, filename: result.filename };
 
-      // Replace placeholder with actual preview
+      // Replace placeholder with actual preview — validate URL first
+      const safeUrl = safeMediaUrl(result.url);
       const isVid = result.type.startsWith('video');
-      wrap.innerHTML = isVid
-        ? `<video src="${result.url}" muted></video><button class="prev-rm" onclick="removeFile(${idx})">✕</button>`
-        : `<img src="${result.url}" alt=""><button class="prev-rm" onclick="removeFile(${idx})">✕</button>`;
+      if (safeUrl) {
+        wrap.innerHTML = isVid
+          ? `<video src="${escapeHtml(safeUrl)}" muted></video><button class="prev-rm" data-idx="${idx}" aria-label="Remove">✕</button>`
+          : `<img src="${escapeHtml(safeUrl)}" alt="Preview"><button class="prev-rm" data-idx="${idx}" aria-label="Remove">✕</button>`;
+      } else {
+        wrap.remove();
+        showToast(`❌ Uploaded file has an invalid URL`, 'err');
+      }
 
       showToast(`✓ ${file.name} uploaded!`);
     } catch(e) {
@@ -583,10 +589,12 @@ async function handleFiles(files) {
 function renderPreview(obj, idx) {
   const wrap = document.createElement('div');
   wrap.className = 'prev-item'; wrap.id = 'prev-' + idx;
+  const safeUrl = safeMediaUrl(obj.url);
+  if (!safeUrl) return; // skip rendering if URL is invalid
   const isVid = (obj.type || '').startsWith('video');
   wrap.innerHTML = isVid
-    ? `<video src="${obj.url}" muted></video><button class="prev-rm" onclick="removeFile(${idx})">✕</button>`
-    : `<img src="${obj.url}" alt=""><button class="prev-rm" onclick="removeFile(${idx})">✕</button>`;
+    ? `<video src="${escapeHtml(safeUrl)}" muted></video><button class="prev-rm" data-idx="${idx}" aria-label="Remove">✕</button>`
+    : `<img src="${escapeHtml(safeUrl)}" alt="Preview"><button class="prev-rm" data-idx="${idx}" aria-label="Remove">✕</button>`;
   prevGrid.appendChild(wrap);
 }
 
@@ -595,6 +603,14 @@ function removeFile(idx) {
   const el = document.getElementById('prev-' + idx);
   if (el) el.remove();
 }
+
+/* ── DELEGATION: preview remove buttons (data-idx) ── */
+document.getElementById('prevGrid').addEventListener('click', e => {
+  const btn = e.target.closest('.prev-rm[data-idx]');
+  if (!btn) return;
+  const idx = Number(btn.dataset.idx);
+  if (!isNaN(idx) && idx >= 0) removeFile(idx);
+});
 
 /* ── GIF SEARCH ── */
 function searchGifs() {
@@ -683,6 +699,16 @@ function escapeHtml(str) {
     .replace(/'/g, '&#039;');
 }
 
+/* ── MEDIA URL PROTOCOL VALIDATION ── */
+function safeMediaUrl(url) {
+  if (!url || typeof url !== 'string') return null;
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol === 'https:' || parsed.protocol === 'http:') return url;
+    return null;
+  } catch { return null; }
+}
+
 /* ── ADMIN FEED ── */
 async function confirmDelete(id, btn) {
   if (!API.isOk()) { openServerModal(); return; }
@@ -733,13 +759,24 @@ async function renderAdminFeed() {
     [...posts].sort((a,b) => (b.pinned?1:0) - (a.pinned?1:0)).forEach(post => {
       const card = document.createElement('div');
       card.className = 'pcard';
-      const rxnHTML = Object.entries(post.reactions || {}).filter(([,n])=>n>0).map(([e,n])=>`<span class="rpill">${e} ${n}</span>`).join('');
+
+      // Reactions — escape emoji and count
+      const rxnHTML = Object.entries(post.reactions || {})
+        .filter(([,n]) => n > 0)
+        .map(([e,n]) => `<span class="rpill">${escapeHtml(e)} ${Number(n)||0}</span>`)
+        .join('');
+
+      // Media — validate protocol before inserting into src
       const mediaHTML = (post.media || []).map(m => {
         const mt = m.type || '';
-        if (mt === 'gif' || mt.startsWith('image')) return `<img class="pmedia" src="${m.url}" alt="" loading="lazy">`;
-        if (mt.startsWith('video')) return `<video class="pmedia" src="${m.url}" controls preload="metadata"></video>`;
+        const safeUrl = safeMediaUrl(m.url);
+        if (!safeUrl) return '';
+        if (mt === 'gif' || mt.startsWith('image')) return `<img class="pmedia" src="${escapeHtml(safeUrl)}" alt="" loading="lazy">`;
+        if (mt.startsWith('video')) return `<video class="pmedia" src="${escapeHtml(safeUrl)}" controls preload="metadata"></video>`;
         return '';
       }).join('');
+
+      // post.id is numeric (Date.now()) — use data-pid instead of inline onclick
       card.innerHTML = `
         ${post.pinned ? '<div class="ppin-lbl">📌 Pinned</div>' : ''}
         <div class="pcard-hd">
@@ -750,17 +787,26 @@ async function renderAdminFeed() {
         ${mediaHTML}
         ${rxnHTML ? `<div class="preacts">${rxnHTML}</div>` : ''}
         <div class="pactions">
-          <button class="act-pin" onclick="togglePin(${post.id})">${post.pinned?'📌 Unpin':'📌 Pin'}</button>
-          <button class="act-del" onclick="confirmDelete(${post.id}, this)">🗑 Delete</button>
+          <button class="act-pin" data-action="pin" data-pid="${post.id}">${post.pinned?'📌 Unpin':'📌 Pin'}</button>
+          <button class="act-del" data-action="del" data-pid="${post.id}">🗑 Delete</button>
         </div>`;
       feed.appendChild(card);
     });
   } catch (e) {
-    feed.innerHTML = `<div class="empty-msg" style="color:var(--red)">⚠ Could not load posts.<br><small>${e.message}</small></div>`;
+    feed.innerHTML = `<div class="empty-msg" style="color:var(--red)">⚠ Could not load posts.<br><small>${escapeHtml(e.message)}</small></div>`;
   }
 }
 
-/* ── CATEGORY SELECT ── */
+/* ── DELEGATION: post pin / delete (data-pid) ── */
+document.getElementById('adminFeed').addEventListener('click', e => {
+  const btn = e.target.closest('[data-action][data-pid]');
+  if (!btn) return;
+  const pid = Number(btn.dataset.pid);
+  if (!pid) return;
+  const action = btn.dataset.action;
+  if (action === 'pin') togglePin(pid);
+  else if (action === 'del') confirmDelete(pid, btn);
+});
 async function fetchCatsAPI() {
   try {
     if (API.isOk()) {
@@ -782,7 +828,9 @@ async function renderCatSelect() {
   const sel = document.getElementById('catSelect');
   if (!sel) return;
   const cats = await fetchCatsAPI();
-  sel.innerHTML = cats.map(c => `<option value="${c.name}">${c.emoji} ${c.name}</option>`).join('');
+  sel.innerHTML = cats.map(c =>
+    `<option value="${escapeHtml(c.name)}">${escapeHtml(c.emoji)} ${escapeHtml(c.name)}</option>`
+  ).join('');
 }
 
 /* ── CATEGORY MANAGER ── */
@@ -800,14 +848,22 @@ async function renderCatList() {
     const item = document.createElement('div');
     item.className = 'cat-item';
     item.innerHTML = `
-      <span class="cat-item-icon">${cat.emoji}</span>
-      <span class="cat-item-name">${cat.name}</span>
-      ${isDef ? '<span class="cat-item-def">default</span>' : `<button class="cat-rm" onclick="removeCat('${cat.name}',this)">Remove</button>`}`;
+      <span class="cat-item-icon">${escapeHtml(cat.emoji)}</span>
+      <span class="cat-item-name">${escapeHtml(cat.name)}</span>
+      ${isDef
+        ? '<span class="cat-item-def">default</span>'
+        : `<button class="cat-rm" data-category="${escapeHtml(cat.name)}" aria-label="Remove category">Remove</button>`}`;
     list.appendChild(item);
   });
 }
 
-function toggleEmojiPicker() {
+/* ── DELEGATION: category remove (data-category) ── */
+document.getElementById('catList').addEventListener('click', e => {
+  const btn = e.target.closest('.cat-rm[data-category]');
+  if (!btn) return;
+  const name = btn.dataset.category;
+  if (name) removeCat(name, btn);
+});
   const pop = document.getElementById('emojiPickerPop');
   if (pop.style.display !== 'none') { pop.style.display = 'none'; return; }
   pop.innerHTML = '';
