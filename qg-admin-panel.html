@@ -864,6 +864,8 @@ document.getElementById('catList').addEventListener('click', e => {
   const name = btn.dataset.category;
   if (name) removeCat(name, btn);
 });
+
+function toggleEmojiPicker() {
   const pop = document.getElementById('emojiPickerPop');
   if (pop.style.display !== 'none') { pop.style.display = 'none'; return; }
   pop.innerHTML = '';
