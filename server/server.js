@@ -94,11 +94,38 @@ const storage = multer.diskStorage({
 
 const upload = multer({
   storage,
-  limits: { fileSize: 200 * 1024 * 1024 }, // 200MB max per file
+
+  limits: {
+    fileSize: 200 * 1024 * 1024
+  },
+
   fileFilter(req, file, cb) {
-    const allowed = /image\/(jpeg|png|gif|webp)|video\/(mp4|webm|quicktime)/;
-    if (allowed.test(file.mimetype)) cb(null, true);
-    else cb(new Error('File type not allowed'));
+    const mimeByExtension = {
+      '.jpg':  ['image/jpeg'],
+      '.jpeg': ['image/jpeg'],
+      '.png':  ['image/png'],
+      '.gif':  ['image/gif'],
+      '.webp': ['image/webp'],
+
+      '.mp4':  ['video/mp4'],
+      '.webm': ['video/webm'],
+      '.mov':  ['video/quicktime']
+    };
+
+    const ext = path.extname(file.originalname).toLowerCase();
+    const allowedMimes = mimeByExtension[ext];
+
+    // Extension is not allowed
+    if (!allowedMimes) {
+      return cb(new Error('Unsupported file type'));
+    }
+
+    // Extension and MIME type don't agree
+    if (!allowedMimes.includes(file.mimetype.toLowerCase())) {
+      return cb(new Error('File extension and MIME type do not match'));
+    }
+
+    cb(null, true);
   }
 });
 
