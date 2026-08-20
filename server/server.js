@@ -70,8 +70,12 @@ function readJSON(file, fallback) {
   catch { return fallback; }
 }
 function writeJSON(file, data) {
-  try { fs.writeFileSync(file, JSON.stringify(data, null, 2)); }
-  catch(e) { console.error('Write error:', e.message); }
+  try {
+    fs.writeFileSync(file, JSON.stringify(data, null, 2));
+  } catch (e) {
+    console.error('Write error:', e.message);
+    throw e;
+  }
 }
 const getPosts  = () => readJSON(POSTS_F, []);
 const savePosts = d  => writeJSON(POSTS_F, d);
