@@ -86,10 +86,28 @@ const saveCats  = d  => writeJSON(CATS_F, d);
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, UPLOADS_DIR),
   filename: (req, file, cb) => {
-    const ext  = path.extname(file.originalname).toLowerCase();
-    const name = `${Date.now()}-${crypto.randomBytes(6).toString('hex')}${ext}`;
-    cb(null, name);
+  const ext = path.extname(file.originalname).toLowerCase();
+
+  const allowedExtensions = new Set([
+    '.jpg',
+    '.jpeg',
+    '.png',
+    '.gif',
+    '.webp',
+    '.mp4',
+    '.webm',
+    '.mov'
+  ]);
+
+  if (!allowedExtensions.has(ext)) {
+    return cb(new Error('Unsupported file extension'));
   }
+
+  const name =
+    `${Date.now()}-${crypto.randomBytes(6).toString('hex')}${ext}`;
+
+  cb(null, name);
+}
 });
 
 const upload = multer({
