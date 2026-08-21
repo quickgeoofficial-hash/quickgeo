@@ -415,7 +415,11 @@ app.post('/api/posts', adminOnly, (req, res) => {
   };
   const posts = getPosts();
   posts.unshift(post);
-  savePosts(posts);
+  try {
+    savePosts(posts);
+  } catch(e) {
+    return res.status(500).json({ error: 'Failed to persist post. Please try again.' });
+  }
   const { reactUsers, ...safe } = post;
   res.status(201).json(safe);
 });
@@ -428,7 +432,11 @@ app.delete('/api/posts/:id', adminOnly, (req, res) => {
   // Delete associated uploaded files from disk
   deleteUploadedFiles(posts[idx].media);
   posts.splice(idx, 1);
-  savePosts(posts);
+  try {
+    savePosts(posts);
+  } catch(e) {
+    return res.status(500).json({ error: 'Failed to persist deletion. Please try again.' });
+  }
   res.json({ ok: true });
 });
 
@@ -437,7 +445,11 @@ app.patch('/api/posts/:id/pin', adminOnly, (req, res) => {
   const p     = posts.find(p => p.id === Number(req.params.id));
   if (!p) return res.status(404).json({ error: 'Post not found' });
   p.pinned = !p.pinned;
-  savePosts(posts);
+  try {
+    savePosts(posts);
+  } catch(e) {
+    return res.status(500).json({ error: 'Failed to persist pin state. Please try again.' });
+  }
   res.json({ ok: true, pinned: p.pinned });
 });
 
@@ -492,7 +504,11 @@ app.post('/api/posts/:id/react', (req, res) => {
     p.reactions[emoji] = (p.reactions[emoji]||0)+1;
     p.reactUsers[key]  = true; nowReacted = true;
   }
-  savePosts(posts);
+  try {
+    savePosts(posts);
+  } catch(e) {
+    return res.status(500).json({ error: 'Failed to persist reaction. Please try again.' });
+  }
   res.json({ reactions: p.reactions, reacted: nowReacted });
 });
 
@@ -506,7 +522,11 @@ app.post('/api/categories', adminOnly, (req, res) => {
   if (cats.some(c => c.name.toLowerCase()===name.toLowerCase()))
     return res.status(409).json({ error: 'Category already exists' });
   cats.push({ emoji: emoji||'📌', name });
-  saveCats(cats);
+  try {
+    saveCats(cats);
+  } catch(e) {
+    return res.status(500).json({ error: 'Failed to persist category. Please try again.' });
+  }
   res.status(201).json({ ok: true });
 });
 
@@ -515,7 +535,11 @@ app.delete('/api/categories/:name', adminOnly, (req, res) => {
   const before = cats.length;
   cats = cats.filter(c => c.name !== decodeURIComponent(req.params.name));
   if (cats.length===before) return res.status(404).json({ error: 'Category not found' });
-  saveCats(cats);
+  try {
+    saveCats(cats);
+  } catch(e) {
+    return res.status(500).json({ error: 'Failed to persist category deletion. Please try again.' });
+  }
   res.json({ ok: true });
 });
 
