@@ -303,15 +303,87 @@ function deleteUploadedFiles(media = []) {
 }
 
 /* ── LOGIN / AUTH ── */
-app.post('/api/login', (req, res) => {
-  const { username, password } = req.body || {};
-  if (username === config.adminUsername && password === config.adminPassword) {
-    const token = createSession();
-    console.log(`[AUTH] Login OK: ${username}`);
-    return res.json({ token, expiresIn: `${config.sessionHours}h` });
+/* ── LOGIN RATE LIMIT ── */
+const loginAttempts = new Map();
+
+const LOGIN_WINDOW_MS = 15 * 60 * 1000;
+const LOGIN_MAX_ATTEMPTS = 10;
+
+function getClientIp(req) {
+  const forwarded = req.headers['x-forwarded-for'];
+
+  if (typeof forwarded === 'string' && forwarded.trim()) {
+    return forwarded.split(',')[0].trim();
   }
+
+  return req.ip || req.socket.remoteAddress || 'unknown';
+}
+
+function isLoginBlocked(ip) {
+  const now = Date.now();
+  const record = loginAttempts.get(ip);
+
+  if (!record) return false;
+
+  if (now - record.firstAttempt > LOGIN_WINDOW_MS) {
+    loginAttempts.delete(ip);
+    return false;
+  }
+
+  return record.count >= LOGIN_MAX_ATTEMPTS;
+}
+
+function recordLoginFailure(ip) {
+  const now = Date.now();
+  const record = loginAttempts.get(ip);
+
+  if (!record || now - record.firstAttempt > LOGIN_WINDOW_MS) {
+    loginAttempts.set(ip, {
+      count: 1,
+      firstAttempt: now
+    });
+    return;
+  }
+
+  record.count++;
+}
+
+app.post('/api/login', (req, res) => {
+  const ip = getClientIp(req);
+
+  if (isLoginBlocked(ip)) {
+    return res.status(429).json({
+      error: 'Too many login attempts. Please try again later.'
+    });
+  }
+
+  const { username, password } = req.body || {};
+
+  if (
+    username === config.adminUsername &&
+    password === config.adminPassword
+  ) {
+    loginAttempts.delete(ip);
+
+    const token = createSession();
+
+    console.log(`[AUTH] Login OK: ${username}`);
+
+    return res.json({
+      token,
+      expiresIn: `${config.sessionHours}h`
+    });
+  }
+
+  recordLoginFailure(ip);
+
   console.log(`[AUTH] Failed login: ${username || '(blank)'}`);
-  setTimeout(() => res.status(401).json({ error: 'Invalid username or password.' }), 1200);
+
+  setTimeout(() => {
+    res.status(401).json({
+      error: 'Invalid username or password.'
+    });
+  }, 1200);
 });
 
 app.post('/api/logout', (req, res) => {
