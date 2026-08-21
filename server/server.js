@@ -195,22 +195,57 @@ app.use('/uploads', (req, res, next) => {
   };
   const contentType = mimeTypes[ext] || 'application/octet-stream';
 
-  if (range) {
-    // Parse range header: "bytes=start-end"
-    const parts  = range.replace(/bytes=/, '').split('-');
-    const start  = parseInt(parts[0], 10);
-    const end    = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
-    const chunkSize = end - start + 1;
+if (range) {
+  // Parse range header: "bytes=start-end"
+  const match = /^bytes=(\d*)-(\d*)$/.exec(range.trim());
 
-    res.writeHead(206, {
-      'Content-Range'  : `bytes ${start}-${end}/${fileSize}`,
-      'Accept-Ranges'  : 'bytes',
-      'Content-Length' : chunkSize,
-      'Content-Type'   : contentType,
-      'Cache-Control'  : 'public, max-age=86400'
-    });
-    fs.createReadStream(filePath, { start, end }).pipe(res);
+  if (!match) {
+    return res.status(416).set('Content-Range', `bytes */${fileSize}`).end();
+  }
+
+  let start = match[1] === '' ? null : Number(match[1]);
+  let end   = match[2] === '' ? null : Number(match[2]);
+
+  // Handle suffix ranges such as: bytes=-500
+  if (start === null) {
+    const suffixLength = end;
+
+    if (!Number.isInteger(suffixLength) || suffixLength <= 0) {
+      return res.status(416).set('Content-Range', `bytes */${fileSize}`).end();
+    }
+
+    start = Math.max(fileSize - suffixLength, 0);
+    end = fileSize - 1;
   } else {
+    if (!Number.isInteger(start) || start < 0 || start >= fileSize) {
+      return res.status(416).set('Content-Range', `bytes */${fileSize}`).end();
+    }
+
+    // Open-ended range: bytes=100-
+    if (end === null) {
+      end = fileSize - 1;
+    }
+
+    if (!Number.isInteger(end) || end < start) {
+      return res.status(416).set('Content-Range', `bytes */${fileSize}`).end();
+    }
+
+    // Never allow the requested end beyond the actual file.
+    end = Math.min(end, fileSize - 1);
+  }
+
+  const chunkSize = end - start + 1;
+
+  res.writeHead(206, {
+    'Content-Range': `bytes ${start}-${end}/${fileSize}`,
+    'Accept-Ranges': 'bytes',
+    'Content-Length': chunkSize,
+    'Content-Type': contentType,
+    'Cache-Control': 'public, max-age=86400'
+  });
+
+  fs.createReadStream(filePath, { start, end }).pipe(res);
+}else {
     res.writeHead(200, {
       'Content-Length' : fileSize,
       'Content-Type'   : contentType,
