@@ -370,8 +370,41 @@ app.patch('/api/posts/:id/pin', adminOnly, (req, res) => {
 });
 
 app.post('/api/posts/:id/react', (req, res) => {
-  const { emoji, userId } = req.body||{};
-  if (!emoji||!userId) return res.status(400).json({ error: 'emoji and userId required' });
+  const { emoji, userId } = req.body || {};
+
+  const allowedEmojis = new Set([
+    '👍',
+    '❤️',
+    '😂',
+    '😮',
+    '😢',
+    '😡',
+    '🔥',
+    '🎉'
+  ]);
+
+  if (!emoji || !userId) {
+    return res.status(400).json({
+      error: 'emoji and userId required'
+    });
+  }
+
+  if (!allowedEmojis.has(emoji)) {
+    return res.status(400).json({
+      error: 'Invalid reaction'
+    });
+  }
+
+  if (
+    typeof userId !== 'string' ||
+    userId.length < 8 ||
+    userId.length > 128 ||
+    !/^[a-zA-Z0-9_-]+$/.test(userId)
+  ) {
+    return res.status(400).json({
+      error: 'Invalid userId'
+    });
+  }
   const posts = getPosts();
   const p     = posts.find(p => p.id === Number(req.params.id));
   if (!p) return res.status(404).json({ error: 'Post not found' });
