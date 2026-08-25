@@ -333,8 +333,18 @@ const API = {
 
 // Unique user ID for reactions (persists in localStorage)
 function getUserId() {
+  const UID_RE = /^u_[A-Za-z0-9_-]{6,126}$/;
   let id = localStorage.getItem('qg_uid');
-  if (!id) { id = 'u_' + Date.now().toString(36) + Math.random().toString(36).slice(2,6); localStorage.setItem('qg_uid', id); }
+  // Validate stored ID — regenerate if missing, wrong format, or fails server pattern
+  if (!id || !UID_RE.test(id)) {
+    // Combine timestamp (base36) + sufficient random bytes for uniqueness + min length
+    const ts  = Date.now().toString(36);                        // ~8 chars
+    const rnd = Math.random().toString(36).slice(2)             // ~10 chars
+              + Math.random().toString(36).slice(2);            // extra safety
+    id = 'u_' + ts + rnd;
+    id = id.slice(0, 64); // cap at 64 chars, well within 128
+    localStorage.setItem('qg_uid', id);
+  }
   return id;
 }
 
@@ -528,28 +538,51 @@ function safeMediaUrl(url) {
   }
 }
 
+/* ── In-flight guard: prevents duplicate simultaneous requests for same post+emoji ── */
+const _reactInFlight = new Set();
+
+/* ── Client-side emoji allowlist (must match what server accepts) ── */
+const VALID_EMOJIS = new Set(EMOJIS);
+const UID_RE = /^u_[A-Za-z0-9_-]{6,126}$/;
+
 async function react(postId, emoji) {
+  // Validate postId
+  if (!postId || typeof postId !== 'number' || !Number.isFinite(postId)) return;
+  // Validate emoji against known set
+  if (!VALID_EMOJIS.has(emoji)) return;
+  // Validate userId format before sending
   const userId = getUserId();
-  const key = `${postId}_${emoji}`;
+  if (!UID_RE.test(userId)) return;
+
+  // Duplicate-click guard: skip if this exact request is already in flight
+  const guardKey = `${postId}_${emoji}`;
+  if (_reactInFlight.has(guardKey)) return;
+  _reactInFlight.add(guardKey);
+
   try {
     if (API.isConfigured()) {
       const data = await API.post(`/api/posts/${postId}/react`, { emoji, userId });
-      // Sync local tracking with server response
-      userReacts[key] = !data.reacted; // server returns reacted=true if now reacted
-      // If the user un-reacted, server returned reacted=false
-      // Actually flip: after un-react server returns the removed state
-      // Let's just reload to get fresh data
+      // Fix: data.reacted=true means now reacted, data.reacted=false means removed
+      if (data.reacted) {
+        userReacts[guardKey] = true;
+      } else {
+        delete userReacts[guardKey];
+      }
       saveReacts();
       await loadPosts();
       return;
     }
   } catch (e) { console.warn('React API error:', e.message); }
+  finally {
+    _reactInFlight.delete(guardKey); // always release guard
+  }
 
   // Offline fallback: update cache
   const posts = getCachedPosts();
   const post = posts.find(p => p.id === postId);
   if (!post) return;
   if (!post.reactions) post.reactions = {};
+  const key = guardKey;
   if (userReacts[key]) {
     post.reactions[emoji] = Math.max(0, (post.reactions[emoji] || 1) - 1);
     if (!post.reactions[emoji]) delete post.reactions[emoji];
@@ -568,7 +601,12 @@ function getCachedPosts() {
   catch { return []; }
 }
 
-function addEmoji(postId, emoji) { closePicker(); react(postId, emoji); }
+function addEmoji(postId, emoji) {
+  closePicker();
+  // Validate emoji is from our known set before reacting
+  if (!VALID_EMOJIS || !VALID_EMOJIS.has(emoji)) return;
+  react(postId, emoji);
+}
 
 function toggleBM(postId) {
   const idx = bookmarks.indexOf(postId);
@@ -596,7 +634,8 @@ document.addEventListener('click', e => {
   if (btn) {
     const pid   = Number(btn.dataset.pid);
     const emoji = btn.dataset.emoji;
-    if (pid && emoji) react(pid, emoji);
+    // Validate before calling react(): numeric pid, emoji in known set
+    if (pid && Number.isFinite(pid) && VALID_EMOJIS && VALID_EMOJIS.has(emoji)) react(pid, emoji);
   }
 });
 
