@@ -112,7 +112,8 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .post-card.is-pinned { border-left: 3px solid var(--amber); }
 .pin-lbl { font-size: 11px; color: var(--amber); font-weight: 500; padding: 8px 14px 0; display: flex; align-items: center; gap: 5px; }
 .card-head { padding: 12px 14px 0; display: flex; align-items: center; gap: 9px; }
-.ch-avatar { width: 30px; height: 30px; border-radius: 50%; background: var(--green); display: flex; align-items: center; justify-content: center; font-family: 'Syne', sans-serif; font-size: 11px; font-weight: 700; color: #fff; flex-shrink: 0; }
+.ch-avatar { width: 32px; height: 32px; border-radius: 50%; overflow: hidden; flex-shrink: 0; background: var(--green); display: flex; align-items: center; justify-content: center; }
+.ch-avatar img { width: 100%; height: 100%; object-fit: cover; }
 .ch-meta { flex: 1; min-width: 0; }
 .ch-name { font-size: 13px; font-weight: 500; color: var(--text); }
 .ch-time { font-size: 11px; color: var(--text3); }
@@ -157,7 +158,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .install-box { background: var(--surface); border-radius: 20px; padding: 28px 24px; max-width: 340px; width: 100%; text-align: center; border: 1px solid var(--border2); box-shadow: 0 20px 60px rgba(0,0,0,0.22); animation: popIn 0.3s cubic-bezier(0.34,1.56,0.64,1); }
 @keyframes popIn { from{opacity:0;transform:scale(0.86)} to{opacity:1;transform:scale(1)} }
 @keyframes fadeInUp { from{opacity:0;transform:translateX(-50%) translateY(8px)} to{opacity:1;transform:translateX(-50%) translateY(0)} }
-.ib-icon { font-size: 46px; margin-bottom: 10px; }
+.ib-icon { margin-bottom: 12px; display: flex; align-items: center; justify-content: center; }
 .ib-title { font-family: 'Syne', sans-serif; font-size: 17px; font-weight: 700; margin-bottom: 7px; color: var(--text); }
 .ib-desc { font-size: 13px; color: var(--text2); line-height: 1.6; margin-bottom: 16px; }
 .ib-steps { text-align: left; background: var(--surface2); border-radius: 10px; padding: 11px 14px; margin-bottom: 16px; display: flex; flex-direction: column; gap: 9px; }
@@ -174,6 +175,11 @@ footer a { font-size: 12px; color: var(--text3); text-decoration: none; }
 footer a:hover { color: var(--text2); text-decoration: underline; }
 footer span { font-size: 12px; color: var(--text3); }
 
+/* In-feed ad card — shown between posts on all screen sizes */
+.infeed-ad { background: var(--surface); border-radius: 14px; border: 1px solid var(--border); overflow: hidden; box-shadow: var(--shadow); padding: 10px; }
+.infeed-ad-label { font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 6px; display: flex; align-items: center; gap: 4px; }
+.infeed-ad ins { display: block; width: 100%; }
+
 /* ── RESPONSIVE ── */
 @media (max-width: 900px) { .ad-col { width: 120px; } }
 @media (max-width: 700px) { .ad-col { display: none; } .cat-search:focus, .cat-search.has-val { width: 120px; } }
@@ -184,7 +190,7 @@ footer span { font-size: 12px; color: var(--text3); }
 <!-- Install overlay -->
 <div class="overlay" id="installOverlay" style="display:none" role="dialog" aria-modal="true" aria-label="Add to home screen">
   <div class="install-box">
-    <div class="ib-icon">🗺️</div>
+    <div class="ib-icon"><img src="submark.png" alt="Quickgeo" style="width:64px;height:64px;object-fit:contain;border-radius:14px;"></div>
     <div class="ib-title">Add Quickgeo to your screen</div>
     <p class="ib-desc">Get instant access from your home screen — no app store needed!</p>
     <div class="ib-steps" id="installSteps"></div>
@@ -614,14 +620,28 @@ function toggleBM(postId) {
   saveBM(); loadPosts();
 }
 
-function sharePost(postId) {
+async function sharePost(postId) {
   const btn = document.getElementById('s-' + postId);
   const serverUrl = API.base();
-  // Build shareable link: index.html?server=URL#post-ID
-  const shareUrl = serverUrl
+  const url = serverUrl
     ? `${location.origin}${location.pathname}?server=${encodeURIComponent(serverUrl)}#post-${postId}`
     : `${location.href}#post-${postId}`;
-  navigator.clipboard ? navigator.clipboard.writeText(shareUrl).catch(() => {}) : null;
+
+  // Try native share sheet first (Android/iOS)
+  if (navigator.share) {
+    try {
+      await navigator.share({ title: 'Quickgeo', url });
+      return; // native sheet handled it — no button feedback needed
+    } catch(e) {
+      if (e.name === 'AbortError') return; // user cancelled share sheet
+      // fall through to clipboard on other errors
+    }
+  }
+
+  // Fallback: copy to clipboard
+  try {
+    if (navigator.clipboard) await navigator.clipboard.writeText(url);
+  } catch {}
   if (btn) {
     btn.classList.add('copied'); btn.textContent = t('copied');
     setTimeout(() => { btn.classList.remove('copied'); btn.textContent = t('share'); }, 2000);
@@ -780,6 +800,25 @@ async function _doLoadPosts() {
 
   feed.innerHTML = '';
   sorted.forEach((post, i) => {
+    // ── IN-FEED AD: inject after every 3rd post ──
+    // Replace the <ins> tag content with your real AdSense in-feed ad code
+    if (i > 0 && i % 3 === 0) {
+      const adCard = document.createElement('div');
+      adCard.className = 'infeed-ad';
+      adCard.setAttribute('aria-label', 'Advertisement');
+      adCard.innerHTML = `
+        <div class="infeed-ad-label">📢 Advertisement</div>
+        <!-- REPLACE THIS COMMENT WITH YOUR ADSENSE IN-FEED AD CODE:
+        <ins class="adsbygoogle"
+          style="display:block"
+          data-ad-format="fluid"
+          data-ad-layout-key="-fb+5w+4e-db+86"
+          data-ad-client="ca-pub-XXXXXXXXXXXXXXXX"
+          data-ad-slot="XXXXXXXXXX"></ins>
+        <script>(adsbygoogle = window.adsbygoogle || []).push({});<\/script>
+        -->`;
+      feed.appendChild(adCard);
+    }
     const bm = bookmarks.includes(post.id);
     const body = translations[i] || '';
     const didTranslate = needsTr && body && body !== post.text;
@@ -809,7 +848,7 @@ async function _doLoadPosts() {
     card.innerHTML = `
       ${post.pinned ? `<div class="pin-lbl">📌 ${t('pinned')}</div>` : ''}
       <div class="card-head">
-        <div class="ch-avatar" aria-hidden="true">QG</div>
+        <div class="ch-avatar" aria-hidden="true"><img src="submark.png" alt="Quickgeo"></div>
         <div class="ch-meta">
           <div class="ch-name">Quickgeo</div>
           <div class="ch-time"><time>${escapeHtml(post.date)}</time> · ${escapeHtml(post.time)}</div>
