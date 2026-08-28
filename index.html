@@ -627,7 +627,7 @@ function toggleBM(postId) {
 async function sharePost(postId) {
   const btn = document.getElementById('s-' + postId);
   // Clean shareable URL — no server param (DEFAULT_SERVER is hardcoded)
-  const url = `${location.origin}${location.pathname}#post-${postId}`;
+ const url = `${location.origin}/post/${postId}`;
 
   // Try native share sheet first (Android/iOS)
   if (navigator.share) {
