@@ -175,6 +175,10 @@ footer a { font-size: 12px; color: var(--text3); text-decoration: none; }
 footer a:hover { color: var(--text2); text-decoration: underline; }
 footer span { font-size: 12px; color: var(--text3); }
 
+/* Highlighted post when opened via shared link */
+.post-card.highlight-target { border-color: var(--green); box-shadow: 0 0 0 2px var(--green-light), var(--shadow); animation: highlightPulse 2s ease forwards; }
+@keyframes highlightPulse { 0%{border-color:var(--green)} 60%{border-color:var(--green)} 100%{border-color:var(--border)} }
+
 /* In-feed ad card — shown between posts on all screen sizes */
 .infeed-ad { background: var(--surface); border-radius: 14px; border: 1px solid var(--border); overflow: hidden; box-shadow: var(--shadow); padding: 10px; }
 .infeed-ad-label { font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 6px; display: flex; align-items: center; gap: 4px; }
@@ -622,19 +626,16 @@ function toggleBM(postId) {
 
 async function sharePost(postId) {
   const btn = document.getElementById('s-' + postId);
-  const serverUrl = API.base();
-  const url = serverUrl
-    ? `${location.origin}${location.pathname}?server=${encodeURIComponent(serverUrl)}#post-${postId}`
-    : `${location.href}#post-${postId}`;
+  // Clean shareable URL — no server param (DEFAULT_SERVER is hardcoded)
+  const url = `${location.origin}${location.pathname}#post-${postId}`;
 
   // Try native share sheet first (Android/iOS)
   if (navigator.share) {
     try {
       await navigator.share({ title: 'Quickgeo', url });
-      return; // native sheet handled it — no button feedback needed
+      return;
     } catch(e) {
-      if (e.name === 'AbortError') return; // user cancelled share sheet
-      // fall through to clipboard on other errors
+      if (e.name === 'AbortError') return; // user cancelled
     }
   }
 
@@ -930,9 +931,27 @@ if ('serviceWorker' in navigator) {
 }
 
 /* ════════════════════════════
+   SCROLL TO SHARED POST
+════════════════════════════ */
+function scrollToLinkedPost() {
+  const hash = location.hash; // e.g. #post-1787281986197
+  if (!hash || !hash.startsWith('#post-')) return;
+  const el = document.getElementById(hash.slice(1)); // remove #
+  if (!el) return;
+  // Highlight the card
+  el.classList.add('highlight-target');
+  // Smooth scroll into view after brief delay (allow render to settle)
+  setTimeout(() => {
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, 300);
+  // Remove highlight class after animation finishes
+  setTimeout(() => el.classList.remove('highlight-target'), 3000);
+}
+
+/* ════════════════════════════
    INIT
 ════════════════════════════ */
-loadPosts();
+loadPosts().then(() => scrollToLinkedPost());
 setInterval(loadPosts, 20000);
 setTimeout(showInstallPopup, 1500);
 </script>
