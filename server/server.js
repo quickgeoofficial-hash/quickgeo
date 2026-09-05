@@ -402,13 +402,27 @@ app.get('/api/posts', (req, res) => {
 });
 
 app.post('/api/posts', adminOnly, (req, res) => {
-  const { tag, tagEmoji, text, media } = req.body;
+  const { tag, tagEmoji, text, media, replyTo } = req.body;
   if (!tag) return res.status(400).json({ error: 'tag is required' });
   const now  = new Date();
+
+  // Validate replyTo if provided
+  let safeReplyTo = null;
+  if (replyTo && typeof replyTo === 'object') {
+    const refId = Number(replyTo.id);
+    if (refId) safeReplyTo = {
+      id: refId,
+      text: String(replyTo.text || '').slice(0, 200),
+      tag: String(replyTo.tag || ''),
+      tagEmoji: String(replyTo.tagEmoji || '')
+    };
+  }
+
   const post = {
     id: Date.now(), tag, tagEmoji: tagEmoji||'',
     text: text||'',
     media: Array.isArray(media) ? media : [],
+    replyTo: safeReplyTo,
     reactions: {}, reactUsers: {}, pinned: false,
     time: now.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}),
     date: now.toLocaleDateString(), createdAt: now.toISOString()
@@ -436,6 +450,23 @@ app.delete('/api/posts/:id', adminOnly, (req, res) => {
     savePosts(posts);
   } catch(e) {
     return res.status(500).json({ error: 'Failed to persist deletion. Please try again.' });
+  }
+  res.json({ ok: true });
+});
+
+app.patch('/api/posts/:id/edit', adminOnly, (req, res) => {
+  const posts = getPosts();
+  const p     = posts.find(p => p.id === Number(req.params.id));
+  if (!p) return res.status(404).json({ error: 'Post not found' });
+  const { tag, tagEmoji, text } = req.body || {};
+  if (tag)      p.tag      = tag;
+  if (tagEmoji !== undefined) p.tagEmoji = tagEmoji;
+  if (text !== undefined)     p.text     = text;
+  p.editedAt = new Date().toISOString();
+  try {
+    savePosts(posts);
+  } catch(e) {
+    return res.status(500).json({ error: 'Failed to persist edit. Please try again.' });
   }
   res.json({ ok: true });
 });
