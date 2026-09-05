@@ -175,6 +175,15 @@ footer a { font-size: 12px; color: var(--text3); text-decoration: none; }
 footer a:hover { color: var(--text2); text-decoration: underline; }
 footer span { font-size: 12px; color: var(--text3); }
 
+/* Reply quote (Telegram style) */
+.reply-quote { display: flex; gap: 0; margin-bottom: 8px; border-radius: 8px; overflow: hidden; background: var(--bg); cursor: pointer; transition: opacity 0.15s; }
+.reply-quote:hover { opacity: 0.8; }
+.rq-bar { width: 3px; background: var(--green); flex-shrink: 0; }
+.rq-body { padding: 6px 10px; flex: 1; min-width: 0; }
+.rq-tag { font-size: 11px; font-weight: 600; color: var(--green); margin-bottom: 2px; }
+.rq-text { font-size: 12px; color: var(--text2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.edited-badge { font-size: 10px; color: var(--text3); font-weight: 400; font-family: 'DM Sans', sans-serif; margin-left: 4px; }
+
 /* Highlighted post when opened via shared link */
 .post-card.highlight-target { border-color: var(--green); box-shadow: 0 0 0 2px var(--green-light), var(--shadow); animation: highlightPulse 2s ease forwards; }
 @keyframes highlightPulse { 0%{border-color:var(--green)} 60%{border-color:var(--green)} 100%{border-color:var(--border)} }
@@ -228,6 +237,8 @@ footer span { font-size: 12px; color: var(--text3); }
         <div class="lang-item" onclick="setLang('pt','PT','Português',this)" role="option">🇧🇷 Português</div>
       </div>
     </div>
+    <!-- Add to Home Screen -->
+    <button id="addHomeBtn" onclick="triggerInstall()" aria-label="Add to Home Screen" style="display:none;padding:5px 10px;background:var(--green-light);color:var(--green);border:1px solid var(--green);border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;gap:4px;align-items:center">📲 Install</button>
     <!-- Theme -->
     <button class="icon-btn" id="themeBtn" onclick="toggleTheme()" aria-label="Toggle dark/light mode">🌙</button>
   </nav>
@@ -626,8 +637,9 @@ function toggleBM(postId) {
 
 async function sharePost(postId) {
   const btn = document.getElementById('s-' + postId);
-  // Clean shareable URL — no server param (DEFAULT_SERVER is hardcoded)
- const url = `${location.origin}/post/${postId}`;
+  // Use /post/:id route — Worker serves rich OG preview to bots,
+  // real users get redirected to /#post-:id automatically
+  const url = `${location.origin}/post/${postId}`;
 
   // Try native share sheet first (Android/iOS)
   if (navigator.share) {
@@ -635,7 +647,7 @@ async function sharePost(postId) {
       await navigator.share({ title: 'Quickgeo', url });
       return;
     } catch(e) {
-      if (e.name === 'AbortError') return; // user cancelled
+      if (e.name === 'AbortError') return;
     }
   }
 
@@ -657,6 +669,19 @@ document.addEventListener('click', e => {
     const emoji = btn.dataset.emoji;
     // Validate before calling react(): numeric pid, emoji in known set
     if (pid && Number.isFinite(pid) && VALID_EMOJIS && VALID_EMOJIS.has(emoji)) react(pid, emoji);
+  }
+});
+
+/* ── REPLY QUOTE DELEGATION: click quote → scroll to original post ── */
+document.addEventListener('click', e => {
+  const q = e.target.closest('.reply-quote[data-pid]');
+  if (!q) return;
+  const pid = q.dataset.pid;
+  const el  = document.getElementById('post-' + pid);
+  if (el) {
+    el.classList.add('highlight-target');
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setTimeout(() => el.classList.remove('highlight-target'), 3000);
   }
 });
 
@@ -846,16 +871,31 @@ async function _doLoadPosts() {
     const card = document.createElement('article');
     card.className = 'post-card' + (post.pinned ? ' is-pinned' : '');
     card.id = 'post-' + post.id;
+    const replyHTML = post.replyTo ? (() => {
+      const r = post.replyTo;
+      const preview = (r.text || '(media)').slice(0, 100);
+      return `<div class="reply-quote" data-action="scroll-to" data-pid="${r.id}">
+        <div class="rq-bar"></div>
+        <div class="rq-body">
+          <div class="rq-tag">${escapeHtml(r.tagEmoji||'')} ${escapeHtml(r.tag)}</div>
+          <div class="rq-text">${escapeHtml(preview)}</div>
+        </div>
+      </div>`;
+    })() : '';
+
+    const editedBadge = post.editedAt ? `<span class="edited-badge">edited</span>` : '';
+
     card.innerHTML = `
       ${post.pinned ? `<div class="pin-lbl">📌 ${t('pinned')}</div>` : ''}
       <div class="card-head">
         <div class="ch-avatar" aria-hidden="true"><img src="submark.png" alt="Quickgeo"></div>
         <div class="ch-meta">
-          <div class="ch-name">Quickgeo</div>
+          <div class="ch-name">Quickgeo ${editedBadge}</div>
           <div class="ch-time"><time>${escapeHtml(post.date)}</time> · ${escapeHtml(post.time)}</div>
         </div>
         <span class="tag-badge">${escapeHtml(post.tagEmoji||'')} ${escapeHtml(post.tag)}</span>
       </div>
+      ${replyHTML}
       ${body ? `<div class="card-body">${escapeHtml(body)}</div>` : ''}
       ${didTranslate ? `<div class="tr-bar">🌐 ${t('trFrom')}</div>` : ''}
       ${mediaHTML}
@@ -878,7 +918,26 @@ async function _doLoadPosts() {
 let deferredPrompt = null;
 window.addEventListener('beforeinstallprompt', e => {
   e.preventDefault(); deferredPrompt = e;
+  // Show persistent topbar install button
+  const topBtn = document.getElementById('addHomeBtn');
+  if (topBtn) topBtn.style.display = 'inline-flex';
 });
+
+function triggerInstall() {
+  if (deferredPrompt) {
+    deferredPrompt.prompt();
+    deferredPrompt.userChoice.then(r => {
+      if (r.outcome === 'accepted') {
+        const topBtn = document.getElementById('addHomeBtn');
+        if (topBtn) topBtn.style.display = 'none';
+      }
+      deferredPrompt = null;
+    });
+  } else {
+    // iOS or desktop — show the instruction popup
+    showInstallPopup();
+  }
+}
 
 function getOS() {
   const ua = navigator.userAgent;
@@ -921,6 +980,12 @@ function showInstallPopup() {
 function dismissInstall() {
   localStorage.setItem('qg_install_skip', '1');
   document.getElementById('installOverlay').style.display = 'none';
+}
+
+// Show install button immediately on iOS (no beforeinstallprompt on Safari)
+if (/iPad|iPhone|iPod/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1)) {
+  const topBtn = document.getElementById('addHomeBtn');
+  if (topBtn) topBtn.style.display = 'inline-flex';
 }
 
 /* ════════════════════════════
