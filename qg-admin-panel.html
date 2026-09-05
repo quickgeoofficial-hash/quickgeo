@@ -149,6 +149,10 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .pactions { padding: 0 13px 10px; display: flex; gap: 7px; border-top: 1px solid var(--border); padding-top: 8px; margin-top: 1px; }
 .act-pin { font-size: 12px; color: var(--amber); background: var(--amber-light); border: 1px solid var(--amber-border); border-radius: 6px; padding: 4px 10px; cursor: pointer; font-family: 'DM Sans', sans-serif; }
 .act-del { font-size: 12px; color: var(--red); background: var(--red-light); border: 1px solid var(--red-border); border-radius: 6px; padding: 4px 10px; cursor: pointer; font-family: 'DM Sans', sans-serif; transition: all 0.15s; }
+.act-reply { font-size: 12px; color: var(--green); background: var(--green-light); border: 1px solid var(--green); border-radius: 6px; padding: 4px 10px; cursor: pointer; font-family: 'DM Sans', sans-serif; transition: all 0.15s; }
+.act-edit  { font-size: 12px; color: #b07800; background: rgba(255,180,0,0.1); border: 1px solid rgba(255,180,0,0.35); border-radius: 6px; padding: 4px 10px; cursor: pointer; font-family: 'DM Sans', sans-serif; transition: all 0.15s; }
+.act-reply:hover { background: var(--green); color: #fff; }
+.act-edit:hover  { background: rgba(255,180,0,0.22); }
 .ppin-lbl { font-size: 11px; color: var(--amber); font-weight: 500; padding: 5px 13px 0; }
 .empty-msg { text-align: center; padding: 36px 16px; color: var(--text3); font-size: 13px; }
 
@@ -253,6 +257,21 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
           </div>
         </div>
         <div class="card-body">
+
+          <!-- REPLY BAR — shown when replying to a post -->
+          <div id="replyBar" style="display:none;margin-bottom:10px;border-left:3px solid var(--green);padding:7px 10px;background:var(--green-light);border-radius:6px;font-size:12px;color:var(--text2);display:none;align-items:flex-start;gap:8px">
+            <div style="flex:1">
+              <div style="font-size:10px;font-weight:600;color:var(--green);margin-bottom:2px">↩ Replying to</div>
+              <div id="replyBarText" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:340px"></div>
+            </div>
+            <button onclick="cancelReply()" style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:16px;line-height:1;padding:0;flex-shrink:0">✕</button>
+          </div>
+
+          <!-- EDIT MODE INDICATOR -->
+          <div id="editBar" style="display:none;margin-bottom:10px;padding:7px 10px;background:rgba(255,180,0,0.12);border:1px solid rgba(255,180,0,0.3);border-radius:6px;font-size:12px;color:#b07800;align-items:center;gap:8px">
+            <span>✏️ Editing post</span>
+            <button onclick="cancelEdit()" style="margin-left:auto;background:none;border:none;cursor:pointer;color:var(--text3);font-size:13px">Cancel</button>
+          </div>
 
           <div class="fgrp">
             <label for="catSelect">Category</label>
@@ -636,7 +655,70 @@ function searchGifs() {
     .catch(() => { grid.innerHTML = '<p style="grid-column:1/-1;font-size:12px;color:var(--text3);padding:8px">Could not load GIFs.</p>'; });
 }
 
-/* ── PUBLISH ── */
+/* ── EDIT / REPLY STATE ── */
+let _editingPostId = null;  // null = new post, number = editing existing post
+let _replyTo       = null;  // null = no reply, {id, text, tag, tagEmoji} = replying
+
+function startReply(postId) {
+  // Find the post from the feed to get its preview text
+  const posts = _cachedPosts || [];
+  const post  = posts.find(p => p.id === postId);
+  if (!post) { showToast('Could not find post to reply to', 'err'); return; }
+
+  _replyTo = { id: post.id, text: post.text || '', tag: post.tag, tagEmoji: post.tagEmoji || '' };
+
+  const bar = document.getElementById('replyBar');
+  document.getElementById('replyBarText').textContent =
+    `${post.tagEmoji || ''} ${post.tag}: ${(post.text || '(media)').slice(0, 80)}`;
+  bar.style.display = 'flex';
+
+  // Scroll compose area into view and focus text
+  showPanel('compose');
+  document.getElementById('postText').focus();
+}
+
+function cancelReply() {
+  _replyTo = null;
+  document.getElementById('replyBar').style.display = 'none';
+}
+
+function startEdit(postId) {
+  const posts = _cachedPosts || [];
+  const post  = posts.find(p => p.id === postId);
+  if (!post) { showToast('Could not find post to edit', 'err'); return; }
+
+  _editingPostId = postId;
+
+  // Populate form
+  document.getElementById('postText').value = post.text || '';
+  updateCharCount();
+
+  // Set category
+  const sel = document.getElementById('catSelect');
+  if (sel) {
+    const opt = Array.from(sel.options).find(o => o.value === post.tag);
+    if (opt) sel.value = post.tag;
+  }
+
+  // Show edit bar, update button
+  document.getElementById('editBar').style.display = 'flex';
+  document.getElementById('pubBtn').textContent = '✏️ Update Post →';
+
+  showPanel('compose');
+  document.getElementById('postText').focus();
+}
+
+function cancelEdit() {
+  _editingPostId = null;
+  document.getElementById('editBar').style.display = 'none';
+  document.getElementById('pubBtn').textContent = 'Publish Post →';
+  document.getElementById('postText').value = '';
+  updateCharCount();
+}
+
+let _cachedPosts = [];  // keep a local copy for edit/reply lookups
+
+/* ── PUBLISH (handles new post, edit, and reply) ── */
 async function publishPost() {
   if (!API.isOk()) { showToast('Not connected to server', 'err'); return; }
 
@@ -652,13 +734,11 @@ async function publishPost() {
     return;
   }
 
-  // Check if any files are still uploading
   const pendingUploads = uploadedFiles.some((f, i) =>
     f === null && document.getElementById('prev-' + i) !== null
   );
   if (pendingUploads) { showToast('⏳ Wait for uploads to finish', 'err'); return; }
 
-  // P8: media now contains server URLs, not base64
   const media = [];
   if (activeTab === 'image') {
     uploadedFiles.filter(Boolean).forEach(f => media.push({ url: f.url, type: f.type || '' }));
@@ -667,22 +747,36 @@ async function publishPost() {
   }
 
   const btn = document.getElementById('pubBtn');
-  btn.disabled = true; btn.textContent = 'Publishing…';
+  btn.disabled = true;
+  btn.textContent = _editingPostId ? 'Updating…' : 'Publishing…';
 
   try {
-    await API.post('/api/posts', { tag: cat.name, tagEmoji: cat.emoji, text, media }, true);
+    if (_editingPostId) {
+      // EDIT MODE: patch existing post
+      await API.patch(`/api/posts/${_editingPostId}/edit`, { tag: cat.name, tagEmoji: cat.emoji, text });
+      cancelEdit();
+      showToast('✓ Post updated!');
+    } else {
+      // NEW POST (with optional replyTo)
+      const payload = { tag: cat.name, tagEmoji: cat.emoji, text, media };
+      if (_replyTo) payload.replyTo = _replyTo;
+      await API.post('/api/posts', payload, true);
+      cancelReply();
+      showToast('✓ Post published!');
+    }
+
     document.getElementById('postText').value = '';
     updateCharCount();
     prevGrid.innerHTML = '';
     uploadedFiles = []; selectedGif = null;
     document.getElementById('gifGrid').innerHTML = '';
     document.getElementById('gifQuery').value = '';
-    showToast('✓ Post published!');
     renderAdminFeed();
   } catch(e) {
     showToast(`❌ Failed: ${e.message}`, 'err');
   } finally {
-    btn.disabled = false; btn.textContent = 'Publish Post →';
+    btn.disabled = false;
+    btn.textContent = _editingPostId ? '✏️ Update Post →' : 'Publish Post →';
   }
 }
 
@@ -751,6 +845,7 @@ async function renderAdminFeed() {
 
   try {
     const posts = await API.get('/api/posts');
+    _cachedPosts = posts; // cache for edit/reply lookups
     if (countEl) countEl.textContent = `${posts.length} post${posts.length !== 1 ? 's' : ''}`;
 
     if (!posts.length) { feed.innerHTML = '<div class="empty-msg">No posts yet. Publish your first update!</div>'; return; }
@@ -787,8 +882,10 @@ async function renderAdminFeed() {
         ${mediaHTML}
         ${rxnHTML ? `<div class="preacts">${rxnHTML}</div>` : ''}
         <div class="pactions">
-          <button class="act-pin" data-action="pin" data-pid="${post.id}">${post.pinned?'📌 Unpin':'📌 Pin'}</button>
-          <button class="act-del" data-action="del" data-pid="${post.id}">🗑 Delete</button>
+          <button class="act-reply" data-action="reply" data-pid="${post.id}">↩ Reply</button>
+          <button class="act-edit"  data-action="edit"  data-pid="${post.id}">✏️ Edit</button>
+          <button class="act-pin"   data-action="pin"   data-pid="${post.id}">${post.pinned?'📌 Unpin':'📌 Pin'}</button>
+          <button class="act-del"   data-action="del"   data-pid="${post.id}">🗑 Delete</button>
         </div>`;
       feed.appendChild(card);
     });
@@ -797,15 +894,17 @@ async function renderAdminFeed() {
   }
 }
 
-/* ── DELEGATION: post pin / delete (data-pid) ── */
+/* ── DELEGATION: post pin / delete / edit / reply (data-pid) ── */
 document.getElementById('adminFeed').addEventListener('click', e => {
   const btn = e.target.closest('[data-action][data-pid]');
   if (!btn) return;
   const pid = Number(btn.dataset.pid);
   if (!pid) return;
   const action = btn.dataset.action;
-  if (action === 'pin') togglePin(pid);
-  else if (action === 'del') confirmDelete(pid, btn);
+  if (action === 'pin')   togglePin(pid);
+  else if (action === 'del')   confirmDelete(pid, btn);
+  else if (action === 'edit')  startEdit(pid);
+  else if (action === 'reply') startReply(pid);
 });
 async function fetchCatsAPI() {
   try {
