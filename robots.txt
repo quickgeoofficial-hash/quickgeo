@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+
+# Block admin pages from indexing
+Disallow: /qg-admin-panel.html
+Disallow: /qg-secure-login.html
+
+Sitemap: https://quickgeo.live/sitemap.xml
