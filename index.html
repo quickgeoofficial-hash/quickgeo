@@ -3,14 +3,24 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Quickgeo — Geopolitics News Channel</title>
-<meta name="description" content="Quickgeo is a live geopolitics news channel delivering the latest updates on global politics, international relations, and world affairs.">
+<title>Quickgeo — Live Geopolitics & World News</title>
+<meta name="description" content="Follow live geopolitics, international conflicts, diplomacy and major world developments on Quickgeo. Updated in real time.">
 <meta name="robots" content="index, follow">
 <meta name="theme-color" content="#1D9E75">
-<meta property="og:title" content="Quickgeo — Geopolitics News">
-<meta property="og:description" content="Live geopolitics updates — global politics, international relations, world affairs.">
-<meta property="og:type" content="website">
-<meta property="og:image" content="logo.png">
+<meta property="og:type"        content="website">
+<meta property="og:site_name"   content="Quickgeo">
+<meta property="og:title"       content="Quickgeo — Live Geopolitics & World News">
+<meta property="og:description" content="Fast geopolitics updates without the noise — wars, diplomacy, elections, conflicts and world affairs.">
+<meta property="og:image"       content="https://quickgeo.live/logo.png">
+<meta property="og:image:width" content="1080">
+<meta property="og:image:height" content="1080">
+<meta property="og:url"         content="https://quickgeo.live">
+<meta property="og:locale"      content="en_US">
+<meta name="twitter:card"       content="summary_large_image">
+<meta name="twitter:title"      content="Quickgeo — Live Geopolitics & World News">
+<meta name="twitter:description" content="Fast geopolitics updates without the noise — wars, diplomacy, elections and world affairs.">
+<meta name="twitter:image"      content="https://quickgeo.live/logo.png">
+<link rel="canonical"           href="https://quickgeo.live">
 <link rel="icon" type="image/png" href="submark.png">
 <link rel="apple-touch-icon" href="submark.png">
 <link rel="manifest" href="manifest.json">
@@ -177,6 +187,17 @@ footer a { font-size: 12px; color: var(--text3); text-decoration: none; }
 footer a:hover { color: var(--text2); text-decoration: underline; }
 footer span { font-size: 12px; color: var(--text3); }
 
+/* Feed tagline */
+.feed-tagline { font-size: 12px; color: var(--text3); margin-top: 2px; }
+
+/* Skeleton loading cards */
+.skeleton-card { background: var(--surface); border-radius: 14px; border: 1px solid var(--border); padding: 16px; margin-bottom: 12px; }
+.skel-line { background: linear-gradient(90deg, var(--border) 25%, var(--bg) 50%, var(--border) 75%); background-size: 200% 100%; border-radius: 6px; animation: shimmer 1.4s infinite; }
+.skel-tag  { height: 10px; width: 60px; margin-bottom: 10px; }
+.skel-txt1 { height: 13px; width: 100%; margin-bottom: 7px; }
+.skel-txt2 { height: 13px; width: 75%; }
+@keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+
 /* Reply quote (Telegram style) */
 .reply-quote { display: flex; gap: 0; margin-bottom: 8px; border-radius: 8px; overflow: hidden; background: var(--bg); cursor: pointer; transition: opacity 0.15s; }
 .reply-quote:hover { opacity: 0.8; }
@@ -275,7 +296,10 @@ footer span { font-size: 12px; color: var(--text3); }
   <main class="feed-col" id="feedCol">
     <div class="feed-inner">
       <div class="feed-hdr">
-        <h2 id="lblLatest">Latest Updates</h2>
+        <div>
+          <h2 id="lblLatest">Latest Updates</h2>
+          <p class="feed-tagline">Geopolitics, conflicts and world affairs — updated live.</p>
+        </div>
         <button class="refresh-btn" id="lblRefresh" onclick="loadPosts()">↻ Refresh</button>
       </div>
 
@@ -310,7 +334,7 @@ footer span { font-size: 12px; color: var(--text3); }
 
 <!-- Footer — required for AdSense approval -->
 <footer>
-  <span>© 2025 Quickgeo</span>
+  <span>© 2026 Quickgeo. All rights reserved.</span>
   <a href="privacy.html">Privacy Policy</a>
   <a href="about.html">About</a>
   <a href="contact.html">Contact</a>
@@ -980,7 +1004,7 @@ function showInstallPopup() {
 }
 
 function dismissInstall() {
-  localStorage.setItem('qg_install_skip', '1');
+  localStorage.setItem('qg_install_dismissed', Date.now()); // suppress for 7 days
   document.getElementById('installOverlay').style.display = 'none';
 }
 
@@ -988,6 +1012,20 @@ function dismissInstall() {
 if (/iPad|iPhone|iPod/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1)) {
   const topBtn = document.getElementById('addHomeBtn');
   if (topBtn) topBtn.style.display = 'inline-flex';
+}
+
+/* ════════════════════════════
+   SKELETON LOADER
+════════════════════════════ */
+function showSkeletons(n = 3) {
+  const feed = document.getElementById('postFeed');
+  if (!feed || feed.children.length > 0) return;
+  feed.innerHTML = Array.from({length: n}, () => `
+    <div class="skeleton-card">
+      <div class="skel-line skel-tag"></div>
+      <div class="skel-line skel-txt1"></div>
+      <div class="skel-line skel-txt2"></div>
+    </div>`).join('');
 }
 
 /* ════════════════════════════
@@ -1001,26 +1039,40 @@ if ('serviceWorker' in navigator) {
    SCROLL TO SHARED POST
 ════════════════════════════ */
 function scrollToLinkedPost() {
-  const hash = location.hash; // e.g. #post-1787281986197
+  const hash = location.hash;
   if (!hash || !hash.startsWith('#post-')) return;
-  const el = document.getElementById(hash.slice(1)); // remove #
+  const el = document.getElementById(hash.slice(1));
   if (!el) return;
-  // Highlight the card
   el.classList.add('highlight-target');
-  // Smooth scroll into view after brief delay (allow render to settle)
-  setTimeout(() => {
-    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  }, 300);
-  // Remove highlight class after animation finishes
+  setTimeout(() => { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 300);
   setTimeout(() => el.classList.remove('highlight-target'), 3000);
 }
 
 /* ════════════════════════════
    INIT
 ════════════════════════════ */
+// Show skeleton cards immediately while posts load
+showSkeletons(3);
+
+// Load posts then scroll to linked post if any
 loadPosts().then(() => scrollToLinkedPost());
 setInterval(loadPosts, 20000);
-setTimeout(showInstallPopup, 1500);
+
+// Delay install popup — only after 15s (let user read first)
+// Don't show again for 7 days after dismissal
+const _lastDismissed = Number(localStorage.getItem('qg_install_dismissed') || 0);
+const _daysSince = (Date.now() - _lastDismissed) / (1000 * 60 * 60 * 24);
+if (_daysSince > 7) {
+  setTimeout(showInstallPopup, 15000);
+}
+
+// iOS — show topbar install button immediately
+if (/iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1)) {
+  const topBtn = document.getElementById('addHomeBtn');
+  if (topBtn) topBtn.style.display = 'inline-flex';
+}
+
 </script>
 </body>
 </html>
