@@ -606,6 +606,14 @@ async function react(postId, emoji) {
   if (_reactInFlight.has(guardKey)) return;
   _reactInFlight.add(guardKey);
 
+  // Save scroll position — loadPosts() rebuilds the DOM which resets scroll
+  const savedScroll = window.scrollY;
+
+  function restoreScroll() {
+    // Use requestAnimationFrame to restore after DOM repaint
+    requestAnimationFrame(() => window.scrollTo({ top: savedScroll, behavior: 'instant' }));
+  }
+
   try {
     if (API.isConfigured()) {
       const data = await API.post(`/api/posts/${postId}/react`, { emoji, userId });
@@ -617,6 +625,7 @@ async function react(postId, emoji) {
       }
       saveReacts();
       await loadPosts();
+      restoreScroll(); // ← restore after reload
       return;
     }
   } catch (e) { console.warn('React API error:', e.message); }
@@ -640,7 +649,8 @@ async function react(postId, emoji) {
   }
   localStorage.setItem(CACHE_POSTS, JSON.stringify(posts));
   saveReacts();
-  loadPosts();
+  await loadPosts();
+  restoreScroll(); // ← restore after offline reload too
 }
 
 function getCachedPosts() {
