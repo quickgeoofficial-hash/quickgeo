@@ -30,8 +30,7 @@
 <meta name="apple-mobile-web-app-title" content="Quickgeo">
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
 <!-- Google AdSense -->
-<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7714449427310539"
-     crossorigin="anonymous"></script>
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7714449427310539" crossorigin="anonymous"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -279,7 +278,7 @@ footer span { font-size: 12px; color: var(--text3); }
         <!-- Example:
         <ins class="adsbygoogle"
           style="display:block;width:120px;height:240px"
-          data-ad-client="ca-pub-8046191829169948"
+          data-ad-client="ca-pub-7714449427310539"
           data-ad-slot="XXXXXXXXXX"></ins>
         <script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
         -->
@@ -876,7 +875,7 @@ async function _doLoadPosts() {
           style="display:block"
           data-ad-format="fluid"
           data-ad-layout-key="-fb+5w+4e-db+86"
-          data-ad-client="ca-pub-8046191829169948"
+          data-ad-client="ca-pub-7714449427310539"
           data-ad-slot="XXXXXXXXXX"></ins>
         <script>(adsbygoogle = window.adsbygoogle || []).push({});<\/script>
         -->`;
@@ -1067,7 +1066,12 @@ showSkeletons(3);
 
 // Load posts then scroll to linked post if any
 loadPosts().then(() => scrollToLinkedPost());
-setInterval(loadPosts, 20000);
+// Auto-refresh every 20s — preserve scroll position so user isn't disrupted
+setInterval(async () => {
+  const savedScroll = window.scrollY;
+  await loadPosts();
+  requestAnimationFrame(() => window.scrollTo({ top: savedScroll, behavior: 'instant' }));
+}, 20000);
 
 // Delay install popup — only after 15s (let user read first)
 // Don't show again for 7 days after dismissal
