@@ -1,40 +1,45 @@
 #!/data/data/com.termux/files/usr/bin/bash
-# ═══════════════════════════════════════════
-#  Quickgeo — One-time Termux Setup Script
-#  Run this ONCE to install everything
-# ═══════════════════════════════════════════
+# Quickgeo — One-time Setup Script (v3.0)
+echo "Setting up Quickgeo v3.0..."
 
-set -e   # stop on any error
+# Storage permission
+termux-setup-storage
 
-echo ""
-echo "╔══════════════════════════════════════╗"
-echo "║    Quickgeo Server — First Setup     ║"
-echo "╚══════════════════════════════════════╝"
-echo ""
-echo "📦  Step 1/5 — Updating package list..."
-pkg update -y -q
+# Install system packages
+pkg update -y
+pkg install -y nodejs python make build-essential binutils git
 
-echo "📦  Step 2/5 — Installing Node.js..."
-pkg install nodejs -y -q
+# Create project directory
+mkdir -p ~/quickgeo/data ~/quickgeo/uploads
 
-echo "📦  Step 3/5 — Installing Cloudflare Tunnel..."
-pkg install cloudflared -y -q
-
-echo "📦  Step 4/5 — Setting up server files..."
-mkdir -p ~/quickgeo
+# Copy server files
 cp -r /sdcard/quickgeo/server/* ~/quickgeo/ 2>/dev/null || true
 
-# If files weren't copied from sdcard, download them
 cd ~/quickgeo
 
-echo "📦  Step 5/5 — Installing Node.js dependencies..."
-npm install --quiet
+# Install Node dependencies (better-sqlite3 requires native compile)
+npm install
+
+# Create .env from example if not exists
+if [ ! -f ~/quickgeo/.env ]; then
+  cp ~/quickgeo/.env.example ~/quickgeo/.env
+  echo ""
+  echo "⚠  IMPORTANT: Edit your .env file before starting!"
+  echo "   Run: nano ~/quickgeo/.env"
+  echo "   Set ADMIN_USERNAME and ADMIN_PASSWORD"
+fi
+
+# Install cloudflared if not installed
+if ! command -v cloudflared &>/dev/null; then
+  pkg install -y cloudflared 2>/dev/null || \
+  curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-arm64 \
+    -o /data/data/com.termux/files/usr/bin/cloudflared && \
+  chmod +x /data/data/com.termux/files/usr/bin/cloudflared
+fi
 
 echo ""
 echo "✅  Setup complete!"
 echo ""
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo " To START the server, run:"
-echo "   bash ~/quickgeo/start.sh"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo ""
+echo "Next steps:"
+echo "  1. nano ~/quickgeo/.env          # Set your password"
+echo "  2. bash ~/quickgeo/start.sh      # Start the server"
