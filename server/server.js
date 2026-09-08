@@ -4,7 +4,8 @@
  */
 'use strict';
 require('dotenv').config();
-const express=require('express'),fs=require('fs'),path=require('path'),cors=require('cors'),crypto=require('crypto'),multer=require('multer'),Database=require('better-sqlite3');
+const express=require('express'),fs=require('fs'),path=require('path'),cors=require('cors'),crypto=require('crypto'),multer=require('multer');
+const { DatabaseSync } = require('node:sqlite'); // built into Node 22.5+ — no native compilation needed
 const app=express();
 const INSECURE=['Change_Me_Now@2025!','password','123456','admin','quickgeo_admin_2025',''];
 const config={
@@ -18,8 +19,8 @@ const config={
 if(!config.adminPassword||INSECURE.includes(config.adminPassword)){console.error('\n❌  Set ADMIN_PASSWORD in ~/quickgeo/.env\n');process.exit(1);}
 const DATA_DIR=path.join(__dirname,'data'),UPLOADS_DIR=path.join(__dirname,'uploads');
 [DATA_DIR,UPLOADS_DIR].forEach(d=>{if(!fs.existsSync(d))fs.mkdirSync(d,{recursive:true});});
-const db=new Database(path.join(DATA_DIR,'quickgeo.db'));
-db.pragma('journal_mode = WAL');db.pragma('synchronous = NORMAL');
+const db=new DatabaseSync(path.join(DATA_DIR,'quickgeo.db'));
+db.exec('PRAGMA journal_mode = WAL');db.exec('PRAGMA synchronous = NORMAL');
 db.exec(`
 CREATE TABLE IF NOT EXISTS posts(id INTEGER PRIMARY KEY,tag TEXT NOT NULL,tagEmoji TEXT DEFAULT '',text TEXT DEFAULT '',media TEXT DEFAULT '[]',replyTo TEXT DEFAULT NULL,reactions TEXT DEFAULT '{}',reactUsers TEXT DEFAULT '{}',pinned INTEGER DEFAULT 0,time TEXT,date TEXT,createdAt TEXT,editedAt TEXT DEFAULT NULL);
 CREATE TABLE IF NOT EXISTS categories(id INTEGER PRIMARY KEY AUTOINCREMENT,emoji TEXT DEFAULT '📌',name TEXT UNIQUE NOT NULL);
@@ -29,7 +30,7 @@ const DEFAULT_CATS=[{emoji:'🔴',name:'Breaking'},{emoji:'🗺',name:'Maps'},{e
 if(db.prepare('SELECT COUNT(*) as n FROM categories').get().n===0){const ins=db.prepare('INSERT OR IGNORE INTO categories (emoji,name) VALUES (?,?)');DEFAULT_CATS.forEach(c=>ins.run(c.emoji,c.name));console.log('✅  Default categories seeded');}
 (function migrate(){
   const pf=path.join(DATA_DIR,'posts.json'),cf=path.join(DATA_DIR,'categories.json');
-  if(fs.existsSync(pf)){try{const posts=JSON.parse(fs.readFileSync(pf,'utf8'));const ins=db.prepare('INSERT OR IGNORE INTO posts(id,tag,tagEmoji,text,media,replyTo,reactions,reactUsers,pinned,time,date,createdAt,editedAt) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)');db.transaction(()=>posts.forEach(p=>ins.run(p.id,p.tag,p.tagEmoji||'',p.text||'',JSON.stringify(p.media||[]),p.replyTo?JSON.stringify(p.replyTo):null,JSON.stringify(p.reactions||{}),JSON.stringify(p.reactUsers||{}),p.pinned?1:0,p.time||'',p.date||'',p.createdAt||new Date().toISOString(),p.editedAt||null)))();fs.renameSync(pf,pf+'.migrated');console.log(`✅  Migrated ${posts.length} posts`);}catch(e){console.warn('⚠️  posts.json migration:',e.message);}}
+  if(fs.existsSync(pf)){try{const posts=JSON.parse(fs.readFileSync(pf,'utf8'));const ins=db.prepare('INSERT OR IGNORE INTO posts(id,tag,tagEmoji,text,media,replyTo,reactions,reactUsers,pinned,time,date,createdAt,editedAt) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)');db.exec('BEGIN');try{posts.forEach(p=>ins.run(p.id,p.tag,p.tagEmoji||'',p.text||'',JSON.stringify(p.media||[]),p.replyTo?JSON.stringify(p.replyTo):null,JSON.stringify(p.reactions||{}),JSON.stringify(p.reactUsers||{}),p.pinned?1:0,p.time||'',p.date||'',p.createdAt||new Date().toISOString(),p.editedAt||null));db.exec('COMMIT');}catch(txErr){db.exec('ROLLBACK');throw txErr;}fs.renameSync(pf,pf+'.migrated');console.log(`✅  Migrated ${posts.length} posts`);}catch(e){console.warn('⚠️  posts.json migration:',e.message);}}
   if(fs.existsSync(cf)){try{const cats=JSON.parse(fs.readFileSync(cf,'utf8'));const ins=db.prepare('INSERT OR IGNORE INTO categories(emoji,name) VALUES(?,?)');cats.forEach(c=>ins.run(c.emoji||'📌',c.name));fs.renameSync(cf,cf+'.migrated');console.log('✅  Migrated categories');}catch(e){console.warn('⚠️  categories.json migration:',e.message);}}
 })();
 function parsePost(r){return{...r,media:JSON.parse(r.media||'[]'),replyTo:r.replyTo?JSON.parse(r.replyTo):null,reactions:JSON.parse(r.reactions||'{}'),reactUsers:JSON.parse(r.reactUsers||'{}'),pinned:!!r.pinned};}
