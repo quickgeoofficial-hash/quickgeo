@@ -1039,6 +1039,39 @@ function showSkeletons(n = 3) {
 }
 
 /* ════════════════════════════
+   SSE — REAL-TIME UPDATES
+════════════════════════════ */
+let _sse = null;
+let _sseRetries = 0;
+
+function connectSSE() {
+  if (!API.isConfigured()) return;
+  if (_sse) { _sse.close(); _sse = null; }
+
+  _sse = new EventSource(API.base() + '/api/stream');
+
+  _sse.onopen = () => { _sseRetries = 0; };
+
+  _sse.onmessage = (e) => {
+    try {
+      const data = JSON.parse(e.data);
+      if (data.type === 'new_post' || data.type === 'update_post' || data.type === 'delete_post') {
+        const saved = window.scrollY;
+        loadPosts().then(() => requestAnimationFrame(() => window.scrollTo({ top: saved, behavior: 'instant' })));
+      }
+    } catch {}
+  };
+
+  _sse.onerror = () => {
+    _sse.close(); _sse = null;
+    // Exponential back-off: 3s, 6s, 12s, 24s, max 30s
+    const delay = Math.min(3000 * Math.pow(2, _sseRetries), 30000);
+    _sseRetries++;
+    setTimeout(connectSSE, delay);
+  };
+}
+
+/* ════════════════════════════
    SERVICE WORKER
 ════════════════════════════ */
 if ('serviceWorker' in navigator) {
@@ -1064,14 +1097,19 @@ function scrollToLinkedPost() {
 // Show skeleton cards immediately while posts load
 showSkeletons(3);
 
-// Load posts then scroll to linked post if any
-loadPosts().then(() => scrollToLinkedPost());
-// Auto-refresh every 20s — preserve scroll position so user isn't disrupted
+// Initial load then connect SSE for real-time updates
+loadPosts().then(() => {
+  scrollToLinkedPost();
+  connectSSE(); // posts now update in real-time via SSE
+});
+
+// Fallback poll every 60s only if SSE is not available
 setInterval(async () => {
-  const savedScroll = window.scrollY;
+  if (_sse && _sse.readyState === EventSource.OPEN) return; // SSE working — skip
+  const saved = window.scrollY;
   await loadPosts();
-  requestAnimationFrame(() => window.scrollTo({ top: savedScroll, behavior: 'instant' }));
-}, 20000);
+  requestAnimationFrame(() => window.scrollTo({ top: saved, behavior: 'instant' }));
+}, 60000);
 
 // Delay install popup — only after 15s (let user read first)
 // Don't show again for 7 days after dismissal
