@@ -1,6 +1,8 @@
 # Never commit these to GitHub
 node_modules/
 data/
+uploads/
 config.json
+.env
 *.log
 .cloudflared/
