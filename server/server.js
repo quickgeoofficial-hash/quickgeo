@@ -1,10 +1,11 @@
 /**
- * Quickgeo Backend Server v3.0
+ * Quickgeo Backend Server v3.1
  * SQLite · Persistent Sessions · SSE Real-time · dotenv
+ * + Rate limiting · Compression · Security headers · Indexes
  */
 'use strict';
 require('dotenv').config();
-const express=require('express'),fs=require('fs'),path=require('path'),cors=require('cors'),crypto=require('crypto'),multer=require('multer');
+const express=require('express'),fs=require('fs'),path=require('path'),cors=require('cors'),crypto=require('crypto'),multer=require('multer'),compression=require('compression');
 const { DatabaseSync } = require('node:sqlite'); // built into Node 22.5+ — no native compilation needed
 const app=express();
 const INSECURE=['Change_Me_Now@2025!','password','123456','admin','quickgeo_admin_2025',''];
@@ -25,6 +26,8 @@ db.exec(`
 CREATE TABLE IF NOT EXISTS posts(id INTEGER PRIMARY KEY,tag TEXT NOT NULL,tagEmoji TEXT DEFAULT '',text TEXT DEFAULT '',media TEXT DEFAULT '[]',replyTo TEXT DEFAULT NULL,reactions TEXT DEFAULT '{}',reactUsers TEXT DEFAULT '{}',pinned INTEGER DEFAULT 0,time TEXT,date TEXT,createdAt TEXT,editedAt TEXT DEFAULT NULL);
 CREATE TABLE IF NOT EXISTS categories(id INTEGER PRIMARY KEY AUTOINCREMENT,emoji TEXT DEFAULT '📌',name TEXT UNIQUE NOT NULL);
 CREATE TABLE IF NOT EXISTS sessions(token TEXT PRIMARY KEY,expires INTEGER NOT NULL);
+CREATE INDEX IF NOT EXISTS idx_posts_pinned_id ON posts(pinned DESC, id DESC);
+CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires);
 `);
 const DEFAULT_CATS=[{emoji:'🔴',name:'Breaking'},{emoji:'🗺',name:'Maps'},{emoji:'🛰',name:'Satellite'},{emoji:'🌐',name:'OSM'},{emoji:'📊',name:'Data'},{emoji:'✨',name:'Feature'},{emoji:'🔄',name:'Update'}];
 if(db.prepare('SELECT COUNT(*) as n FROM categories').get().n===0){const ins=db.prepare('INSERT OR IGNORE INTO categories (emoji,name) VALUES (?,?)');DEFAULT_CATS.forEach(c=>ins.run(c.emoji,c.name));console.log('✅  Default categories seeded');}
@@ -45,6 +48,38 @@ const upload=multer({storage,limits:{fileSize:50*1024*1024},fileFilter(req,file,
 function delFile(url){if(!url||url.startsWith('data:'))return;try{const fn=url.split('/uploads/').pop();if(fn){const fp=path.join(UPLOADS_DIR,fn);if(fs.existsSync(fp))fs.unlinkSync(fp);}}catch{}}
 const sseClients=new Set();
 function broadcast(data){const msg=`data: ${JSON.stringify(data)}\n\n`;for(const r of sseClients){try{r.write(msg);}catch{sseClients.delete(r);}}}
+
+/* ── RATE LIMITING (pure JS, no dependency, in-memory) ── */
+const rateBuckets=new Map(); // key: `${ip}:${route}` -> {count, resetAt}
+function rateLimit(routeKey,maxRequests,windowMs){
+  return (req,res,next)=>{
+    const ip=req.headers['cf-connecting-ip']||req.headers['x-forwarded-for']||req.ip||'unknown';
+    const key=`${ip}:${routeKey}`;
+    const now=Date.now();
+    let bucket=rateBuckets.get(key);
+    if(!bucket||bucket.resetAt<now){bucket={count:0,resetAt:now+windowMs};rateBuckets.set(key,bucket);}
+    bucket.count++;
+    if(bucket.count>maxRequests){
+      const retryAfter=Math.ceil((bucket.resetAt-now)/1000);
+      res.setHeader('Retry-After',retryAfter);
+      return res.status(429).json({error:`Too many requests. Try again in ${retryAfter}s.`});
+    }
+    next();
+  };
+}
+// Clean expired rate-limit buckets every 5 minutes to avoid memory growth
+setInterval(()=>{const now=Date.now();for(const[k,v]of rateBuckets)if(v.resetAt<now)rateBuckets.delete(k);},300000);
+
+/* ── SECURITY HEADERS (pure JS, no dependency) ── */
+app.use((req,res,next)=>{
+  res.setHeader('X-Content-Type-Options','nosniff');
+  res.setHeader('X-Frame-Options','DENY');
+  res.setHeader('Referrer-Policy','strict-origin-when-cross-origin');
+  res.setHeader('X-XSS-Protection','1; mode=block');
+  next();
+});
+
+app.use(compression()); // gzip all JSON/text responses — big bandwidth savings
 app.use(cors({origin(origin,cb){if(!origin)return cb(null,true);if(config.allowedOrigins.includes(origin))return cb(null,true);cb(new Error(`CORS blocked: ${origin}`));},credentials:true}));
 app.use(express.json({limit:`${config.maxBodyMB}mb`}));
 app.use((req,_,next)=>{console.log(`[${new Date().toLocaleTimeString()}] ${req.method} ${req.path}`);next();});
@@ -57,10 +92,10 @@ app.use('/uploads',(req,res)=>{
   else{res.writeHead(200,{'Content-Length':size,'Content-Type':type,'Accept-Ranges':'bytes','Cache-Control':'public, max-age=86400'});fs.createReadStream(fp).pipe(res);}
 });
 function adminOnly(req,res,next){const auth=req.headers['authorization']||'',tok=auth.startsWith('Bearer ')?auth.slice(7):'';if(!isValidSession(tok))return res.status(401).json({error:'Session expired. Please log in again.'});next();}
-app.get('/health',(req,res)=>res.json({status:'ok',server:'Quickgeo',version:'3.0.0',time:new Date().toISOString(),posts:db.prepare('SELECT COUNT(*) as n FROM posts').get().n,clients:sseClients.size}));
+app.get('/health',(req,res)=>res.json({status:'ok',server:'Quickgeo',version:'3.1.0',time:new Date().toISOString(),posts:db.prepare('SELECT COUNT(*) as n FROM posts').get().n,clients:sseClients.size}));
 app.get('/api/stream',(req,res)=>{res.setHeader('Content-Type','text/event-stream');res.setHeader('Cache-Control','no-cache');res.setHeader('Connection','keep-alive');res.setHeader('X-Accel-Buffering','no');res.flushHeaders();res.write('data: {"type":"connected"}\n\n');sseClients.add(res);const hb=setInterval(()=>{try{res.write(': ping\n\n');}catch{}},25000);req.on('close',()=>{clearInterval(hb);sseClients.delete(res);});});
-app.post('/api/upload',adminOnly,upload.single('file'),(req,res)=>{if(!req.file)return res.status(400).json({error:'No file received'});const isImg=req.file.mimetype.startsWith('image/'),max=isImg?5*1024*1024:50*1024*1024;if(req.file.size>max){fs.unlinkSync(req.file.path);return res.status(400).json({error:`Too large. Max ${isImg?'5MB images':'50MB video'}.`});}const protocol=req.headers['x-forwarded-proto']||req.protocol,host=req.headers['x-forwarded-host']||req.get('host'),url=`${protocol}://${host}/uploads/${req.file.filename}`;console.log(`[UPLOAD] ${req.file.filename} (${(req.file.size/1024/1024).toFixed(2)} MB)`);res.json({url,filename:req.file.filename,size:req.file.size,type:req.file.mimetype});});
-app.post('/api/login',(req,res)=>{const{username,password}=req.body||{};if(username===config.adminUsername&&password===config.adminPassword){const tok=createSession();console.log(`[AUTH] Login OK: ${username}`);return res.json({token:tok,expiresIn:`${config.sessionHours}h`});}console.log(`[AUTH] Failed: ${username||'(blank)'}`);setTimeout(()=>res.status(401).json({error:'Invalid username or password.'}),1200);});
+app.post('/api/upload',adminOnly,rateLimit('upload',30,10*60000),upload.single('file'),(req,res)=>{if(!req.file)return res.status(400).json({error:'No file received'});const isImg=req.file.mimetype.startsWith('image/'),max=isImg?5*1024*1024:50*1024*1024;if(req.file.size>max){fs.unlinkSync(req.file.path);return res.status(400).json({error:`Too large. Max ${isImg?'5MB images':'50MB video'}.`});}const protocol=req.headers['x-forwarded-proto']||req.protocol,host=req.headers['x-forwarded-host']||req.get('host'),url=`${protocol}://${host}/uploads/${req.file.filename}`;console.log(`[UPLOAD] ${req.file.filename} (${(req.file.size/1024/1024).toFixed(2)} MB)`);res.json({url,filename:req.file.filename,size:req.file.size,type:req.file.mimetype});});
+app.post('/api/login',rateLimit('login',5,15*60000),(req,res)=>{const{username,password}=req.body||{};if(username===config.adminUsername&&password===config.adminPassword){const tok=createSession();console.log(`[AUTH] Login OK: ${username}`);return res.json({token:tok,expiresIn:`${config.sessionHours}h`});}console.log(`[AUTH] Failed: ${username||'(blank)'}`);setTimeout(()=>res.status(401).json({error:'Invalid username or password.'}),1200);});
 app.post('/api/logout',(req,res)=>{const auth=req.headers['authorization']||'',tok=auth.startsWith('Bearer ')?auth.slice(7):'';db.prepare('DELETE FROM sessions WHERE token=?').run(tok);res.json({ok:true});});
 app.get('/api/me',adminOnly,(req,res)=>res.json({ok:true,role:'admin'}));
 app.get('/api/posts',(req,res)=>{const posts=getPosts().map(({reactUsers,...p})=>p);res.json(posts);});
@@ -74,7 +109,7 @@ app.post('/api/posts',adminOnly,(req,res)=>{
 app.delete('/api/posts/:id',adminOnly,(req,res)=>{const id=Number(req.params.id),row=db.prepare('SELECT media FROM posts WHERE id=?').get(id);if(!row)return res.status(404).json({error:'Post not found'});try{JSON.parse(row.media||'[]').forEach(m=>delFile(m.url));}catch{}db.prepare('DELETE FROM posts WHERE id=?').run(id);broadcast({type:'delete_post',id});res.json({ok:true});});
 app.patch('/api/posts/:id/edit',adminOnly,(req,res)=>{const id=Number(req.params.id);if(!db.prepare('SELECT id FROM posts WHERE id=?').get(id))return res.status(404).json({error:'Post not found'});const{tag,tagEmoji,text}=req.body||{};db.prepare('UPDATE posts SET tag=COALESCE(?,tag),tagEmoji=COALESCE(?,tagEmoji),text=COALESCE(?,text),editedAt=? WHERE id=?').run(tag||null,tagEmoji!=null?tagEmoji:null,text!=null?text:null,new Date().toISOString(),id);broadcast({type:'update_post',id});res.json({ok:true});});
 app.patch('/api/posts/:id/pin',adminOnly,(req,res)=>{const id=Number(req.params.id),row=db.prepare('SELECT pinned FROM posts WHERE id=?').get(id);if(!row)return res.status(404).json({error:'Post not found'});const p=row.pinned?0:1;db.prepare('UPDATE posts SET pinned=? WHERE id=?').run(p,id);broadcast({type:'update_post',id});res.json({ok:true,pinned:!!p});});
-app.post('/api/posts/:id/react',(req,res)=>{
+app.post('/api/posts/:id/react',rateLimit('react',60,60000),(req,res)=>{
   const{emoji,userId}=req.body||{};if(!emoji||!userId)return res.status(400).json({error:'emoji and userId required'});
   const AL=new Set(['👍','❤️','😂','😮','😢','😡','🔥','🎉','👏','🤔','🌍','💯']);if(!AL.has(emoji))return res.status(400).json({error:'Invalid emoji'});
   if(userId.length<8||userId.length>128||!/^[a-zA-Z0-9_-]+$/.test(userId))return res.status(400).json({error:'Invalid userId'});
@@ -90,12 +125,13 @@ app.post('/api/categories',adminOnly,(req,res)=>{const{emoji,name}=req.body||{};
 app.delete('/api/categories/:name',adminOnly,(req,res)=>{const r=db.prepare('DELETE FROM categories WHERE name=?').run(decodeURIComponent(req.params.name));if(r.changes===0)return res.status(404).json({error:'Category not found'});res.json({ok:true});});
 app.listen(config.port,'0.0.0.0',()=>{
   console.log('\n╔══════════════════════════════════╗');
-  console.log('║   Quickgeo Server v3.0 Running   ║');
+  console.log('║   Quickgeo Server v3.1 Running   ║');
   console.log('╚══════════════════════════════════╝');
   console.log(`\n✅  Port     → ${config.port}`);
   console.log(`👤  Username → ${config.adminUsername}`);
   console.log(`🔒  Password → *** (from .env)`);
   console.log(`🗄️   Database → ${path.join(DATA_DIR,'quickgeo.db')}`);
   console.log(`📁  Uploads  → ${UPLOADS_DIR}`);
-  console.log(`🌐  Origins  → ${config.allowedOrigins.join(', ')}\n`);
+  console.log(`🌐  Origins  → ${config.allowedOrigins.join(', ')}`);
+  console.log(`🛡️   Hardening → rate-limit + gzip + security headers + indexes\n`);
 });
