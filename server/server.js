@@ -178,7 +178,7 @@ app.use('/uploads',(req,res)=>{
   else{res.writeHead(200,{'Content-Length':size,'Content-Type':type,'Accept-Ranges':'bytes','Cache-Control':'public, max-age=86400'});fs.createReadStream(fp).pipe(res);}
 });
 function adminOnly(req,res,next){const auth=req.headers['authorization']||'',tok=auth.startsWith('Bearer ')?auth.slice(7):'';if(!isValidSession(tok))return res.status(401).json({error:'Session expired. Please log in again.'});next();}
-app.get('/health',(req,res)=>res.json({status:'ok',server:'Quickgeo',version:'3.3.0',time:new Date().toISOString(),posts:db.prepare('SELECT COUNT(*) as n FROM posts').get().n,clients:sseClients.size}));
+app.get('/health',(req,res)=>res.json({status:'ok',server:'Quickgeo',version:'3.3.1',time:new Date().toISOString(),posts:db.prepare('SELECT COUNT(*) as n FROM posts').get().n,clients:sseClients.size}));
 app.get('/api/stream',(req,res)=>{res.setHeader('Content-Type','text/event-stream');res.setHeader('Cache-Control','no-cache');res.setHeader('Connection','keep-alive');res.setHeader('X-Accel-Buffering','no');res.flushHeaders();res.write('data: {"type":"connected"}\n\n');sseClients.add(res);const hb=setInterval(()=>{try{res.write(': ping\n\n');}catch{}},25000);req.on('close',()=>{clearInterval(hb);sseClients.delete(res);});});
 app.post('/api/upload',adminOnly,rateLimit('upload',30,10*60000),upload.single('file'),(req,res)=>{
   if(!req.file)return res.status(400).json({error:'No file received'});
@@ -229,6 +229,15 @@ app.get('/api/posts',(req,res)=>{
 app.get('/api/posts/pinned',(req,res)=>{
   const pinned = getPinnedPosts().map(({reactUsers,...p})=>p);
   res.json(pinned);
+});
+app.get('/api/posts/:id(\\d+)',(req,res)=>{
+  // Direct single-post lookup by ID — works regardless of pagination,
+  // whether the post is pinned, or how old it is. Used by the OG preview
+  // worker (and anything else needing one specific post reliably).
+  const row = db.prepare('SELECT * FROM posts WHERE id = ?').get(Number(req.params.id));
+  if (!row) return res.status(404).json({ error: 'Post not found' });
+  const { reactUsers, ...safe } = parsePost(row);
+  res.json(safe);
 });
 app.post('/api/posts',adminOnly,(req,res)=>{
   const{tag,tagEmoji,text,media,replyTo}=req.body;
