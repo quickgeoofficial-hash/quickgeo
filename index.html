@@ -134,10 +134,20 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .card-body { padding: 9px 14px 11px; font-size: 14px; line-height: 1.68; color: var(--text); word-break: break-word; white-space: pre-wrap; }
 .tr-bar { font-size: 11px; color: var(--green-dark); background: var(--green-light); padding: 3px 10px; margin: 0 14px 8px; border-radius: 5px; display: flex; align-items: center; gap: 4px; }
 [data-theme="dark"] .tr-bar { color: #5DCAA5; }
-.media-wrap { background: var(--bg); }
+.media-wrap { background: var(--bg); position: relative; }
 .card-img { width: 100%; max-height: 340px; object-fit: contain; display: block; }
-.card-video { width: 100%; max-height: 400px; display: block; background: #000; object-fit: contain; }
+.card-video { width: 100%; height: auto; max-height: 640px; display: block; background: #000; object-fit: contain; }
 .card-gif { width: 100%; max-height: 260px; object-fit: contain; display: block; background: var(--surface2); }
+
+/* Video play overlay — shown until playback starts, avoids looking "broken" while loading */
+.video-play-overlay {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  width: 58px; height: 58px; border-radius: 50%;
+  background: rgba(0,0,0,0.6); color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px; pointer-events: none; transition: opacity 0.2s ease;
+}
+.video-play-overlay.hide { opacity: 0; visibility: hidden; }
 
 /* Reactions */
 .react-row { padding: 8px 14px; display: flex; flex-wrap: wrap; gap: 5px; align-items: center; border-top: 1px solid var(--border); }
@@ -519,17 +529,19 @@ let activeFilter = 'all';
 let catQuery = '';
 let _cachedCats = DEFAULT_CATS;
 
+let _catInputDebounce = null;
 function onCatInput(inp) {
   catQuery = inp.value.trim().toLowerCase();
   inp.classList.toggle('has-val', catQuery.length > 0);
   activeFilter = 'all';
-  loadPosts();
+  // Debounce: search now hits the server, don't fire a request per keystroke
+  clearTimeout(_catInputDebounce);
+  _catInputDebounce = setTimeout(() => loadPosts(), 350);
 }
 function onCatBlur(inp) { if (!inp.value) inp.classList.remove('has-val'); }
 
-function renderCatPills(cats, posts) {
+function renderCatPills(cats) {
   const wrap = document.getElementById('catPills');
-  const used = new Set(posts.map(p => p.tag));
   wrap.innerHTML = '';
 
   const allBtn = document.createElement('button');
@@ -538,8 +550,12 @@ function renderCatPills(cats, posts) {
   allBtn.onclick = () => { activeFilter = 'all'; loadPosts(); };
   wrap.appendChild(allBtn);
 
+  // Show ALL categories (small dedicated table) — do NOT filter by "used in
+  // currently loaded page" since with pagination only a fraction of posts
+  // are ever loaded at once; filtering by that would make pills randomly
+  // appear/disappear as pages load. Category filtering itself happens
+  // server-side via the ?category= param.
   cats
-    .filter(c => used.has(c.name))
     .filter(c => !catQuery || c.name.toLowerCase().includes(catQuery) || c.emoji.includes(catQuery))
     .forEach(cat => {
       const btn = document.createElement('button');
@@ -722,6 +738,21 @@ async function sharePost(postId) {
   }
 }
 
+/* ── VIDEO PLAY OVERLAY: hide play icon once video actually starts (play doesn't bubble, use capture) ── */
+document.addEventListener('play', (e) => {
+  if (e.target.tagName !== 'VIDEO') return;
+  const wrap = e.target.closest('.media-wrap');
+  const overlay = wrap?.querySelector('.video-play-overlay');
+  if (overlay) overlay.classList.add('hide');
+}, true); // capture phase — required since media events don't bubble
+
+document.addEventListener('pause', (e) => {
+  if (e.target.tagName !== 'VIDEO') return;
+  const wrap = e.target.closest('.media-wrap');
+  const overlay = wrap?.querySelector('.video-play-overlay');
+  if (overlay) overlay.classList.remove('hide'); // show play icon again when paused
+}, true);
+
 /* ── REACTION EVENT DELEGATION (replaces inline onclick on r-btn) ── */
 document.addEventListener('click', e => {
   const btn = e.target.closest('.r-btn[data-pid][data-emoji]');
@@ -803,10 +834,189 @@ function showStatusBanner(type, msg) {
    LOAD POSTS (main render)
 ════════════════════════════ */
 let _loadLock = false;
+/* ── Pagination state ── */
+let _nextCursor = null;      // last regular post id loaded — used as ?before= for next page
+let _hasMorePosts = false;   // does the server have more posts beyond what's loaded?
+let _feedRenderIndex = 0;    // running count of rendered posts, for ad placement across pages
+let _pinnedCache = [];       // small dataset, refetched on every reset
+
 async function loadPosts() {
   if (_loadLock) return;
   _loadLock = true;
   try { await _doLoadPosts(); } finally { _loadLock = false; }
+}
+
+/* Build one post card DOM node — reused for both initial render and "Load More" */
+function createPostCardElement(post, body, didTranslate) {
+  const bm = bookmarks.includes(post.id);
+
+  const mediaHTML = (post.media || []).map(m => {
+    const mt = m.type || '';
+    const safeUrl = safeMediaUrl(m.url);
+    if (!safeUrl) return '';
+    if (mt === 'gif')           return `<div class="media-wrap"><img class="card-gif" src="${escapeHtml(safeUrl)}" alt="GIF" loading="lazy"></div>`;
+    if (mt.startsWith('image')) return `<div class="media-wrap"><img class="card-img" src="${escapeHtml(safeUrl)}" alt="" loading="lazy"></div>`;
+    if (mt.startsWith('video')) return `<div class="media-wrap"><video id="vid-${post.id}-${Math.random().toString(36).slice(2,7)}" class="card-video" src="${escapeHtml(safeUrl)}" controls preload="metadata" playsinline webkit-playsinline></video><div class="video-play-overlay">▶</div></div>`;
+    return '';
+  }).join('');
+
+  const rxns = post.reactions || {};
+  const rxnHTML = buildReactionPillsHTML(post.id, rxns);
+
+  const card = document.createElement('article');
+  card.className = 'post-card' + (post.pinned ? ' is-pinned' : '');
+  card.id = 'post-' + post.id;
+
+  const replyHTML = post.replyTo ? (() => {
+    const r = post.replyTo;
+    const preview = (r.text || '(media)').slice(0, 100);
+    return `<div class="reply-quote" data-action="scroll-to" data-pid="${r.id}">
+      <div class="rq-bar"></div>
+      <div class="rq-body">
+        <div class="rq-tag">${escapeHtml(r.tagEmoji||'')} ${escapeHtml(r.tag)}</div>
+        <div class="rq-text">${escapeHtml(preview)}</div>
+      </div>
+    </div>`;
+  })() : '';
+
+  const editedBadge = post.editedAt ? `<span class="edited-badge">edited</span>` : '';
+
+  card.innerHTML = `
+    ${post.pinned ? `<div class="pin-lbl">📌 ${t('pinned')}</div>` : ''}
+    <div class="card-head">
+      <div class="ch-avatar" aria-hidden="true"><img src="submark.png" alt="Quickgeo"></div>
+      <div class="ch-meta">
+        <div class="ch-name">Quickgeo ${editedBadge}</div>
+        <div class="ch-time"><time>${escapeHtml(post.date)}</time> · ${escapeHtml(post.time)}</div>
+      </div>
+      <span class="tag-badge">${escapeHtml(post.tagEmoji||'')} ${escapeHtml(post.tag)}</span>
+    </div>
+    ${replyHTML}
+    ${body ? `<div class="card-body">${escapeHtml(body)}</div>` : ''}
+    ${didTranslate ? `<div class="tr-bar">🌐 ${t('trFrom')}</div>` : ''}
+    ${mediaHTML}
+    <div class="react-row" role="group">
+      ${rxnHTML}
+      <button type="button" class="r-add" data-action="picker" data-pid="${post.id}">${t('addR')}</button>
+    </div>
+    <div id="ps-${post.id}"></div>
+    <div class="act-row">
+      <button type="button" class="act-btn${bm?' saved':''}" data-action="bookmark" data-pid="${post.id}">${bm?t('saved'):t('save')}</button>
+      <button type="button" class="act-btn" id="s-${post.id}" data-action="share" data-pid="${post.id}">${t('share')}</button>
+    </div>`;
+  return card;
+}
+
+/* Append an in-feed ad card at the current render index if due (every 3rd post) */
+function maybeInsertAd(feed) {
+  if (_feedRenderIndex > 0 && _feedRenderIndex % 3 === 0) {
+    const adCard = document.createElement('div');
+    adCard.className = 'infeed-ad';
+    adCard.setAttribute('aria-label', 'Advertisement');
+    adCard.innerHTML = `
+      <div class="infeed-ad-label">📢 Advertisement</div>
+      <!-- REPLACE THIS COMMENT WITH YOUR ADSENSE IN-FEED AD CODE:
+      <ins class="adsbygoogle"
+        style="display:block"
+        data-ad-format="fluid"
+        data-ad-layout-key="-fb+5w+4e-db+86"
+        data-ad-client="ca-pub-7714449427310539"
+        data-ad-slot="XXXXXXXXXX"></ins>
+      <script>(adsbygoogle = window.adsbygoogle || []).push({});<\/script>
+      -->`;
+    feed.appendChild(adCard);
+  }
+}
+
+/* Render a batch of posts into the feed, applying translation, ads, and card building */
+async function renderPostBatch(feed, posts, needsTr, fromCache) {
+  const translations = await Promise.all(
+    posts.map(p => needsTr ? translateText(p.text, lang) : Promise.resolve(p.text))
+  );
+  posts.forEach((post, i) => {
+    maybeInsertAd(feed);
+    _feedRenderIndex++;
+    const body = translations[i] || '';
+    const didTranslate = needsTr && body && body !== post.text;
+    const card = createPostCardElement(post, body, didTranslate);
+    feed.appendChild(card);
+  });
+}
+
+/* Show/update the "Load More" button at the bottom of the feed */
+let _loadMoreObserver = null;
+function renderLoadMoreButton(feed) {
+  let btn = document.getElementById('loadMoreBtn');
+  if (btn) { if (_loadMoreObserver) _loadMoreObserver.disconnect(); btn.remove(); }
+  if (!_hasMorePosts) return;
+  btn = document.createElement('button');
+  btn.id = 'loadMoreBtn';
+  btn.className = 'refresh-btn';
+  btn.style.cssText = 'display:block;margin:16px auto;padding:10px 24px;';
+  btn.textContent = '↓ Load more posts';
+  btn.onclick = loadMorePosts;
+  feed.appendChild(btn);
+
+  // Infinite scroll: auto-trigger when button scrolls near viewport
+  // (efficient — IntersectionObserver doesn't poll on every scroll event)
+  if ('IntersectionObserver' in window) {
+    _loadMoreObserver = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting) loadMorePosts();
+    }, { rootMargin: '400px' }); // trigger 400px before it's actually visible
+    _loadMoreObserver.observe(btn);
+  }
+}
+
+let _loadMoreLock = false;
+/* Fetch and append the NEXT page — does not touch pinned section or existing posts */
+async function loadMorePosts() {
+  if (_loadMoreLock || !_hasMorePosts || !API.isConfigured()) return;
+  _loadMoreLock = true;
+  const feed = document.getElementById('postFeed');
+  const btn = document.getElementById('loadMoreBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Loading…'; }
+
+  try {
+    const qs = buildFeedQuery({ before: _nextCursor });
+    const resp = await API.get(`/api/posts?${qs}`);
+    const posts = resp.posts || [];
+    _hasMorePosts = resp.hasMore || false;
+    if (posts.length) _nextCursor = posts[posts.length - 1].id;
+
+    _renderedPosts = _renderedPosts.concat(posts);
+    const needsTr = lang !== 'en';
+    await renderPostBatch(feed, posts, needsTr, false);
+    updateOfflineCache(); // extend cache with newly loaded posts
+  } catch (e) {
+    console.warn('loadMorePosts failed:', e.message);
+  } finally {
+    _loadMoreLock = false;
+    renderLoadMoreButton(feed);
+  }
+}
+
+/* Build the query string for the current filter/search state */
+function buildFeedQuery({ before } = {}) {
+  const params = new URLSearchParams();
+  params.set('limit', '20');
+  if (before) params.set('before', before);
+  if (activeFilter !== 'all') params.set('category', activeFilter);
+  if (catQuery) params.set('search', catQuery);
+  return params.toString();
+}
+
+/* Track all currently-rendered posts (pinned + loaded pages) for offline cache + reaction lookups */
+let _renderedPosts = [];
+function updateOfflineCache() {
+  const cacheSafe = _renderedPosts.map(p => ({
+    ...p,
+    media: (p.media || []).map(m => ({
+      ...m,
+      url: (m.url && m.url.startsWith('data:')) ? '' : m.url
+    })).filter(m => m.url)
+  }));
+  try { localStorage.setItem(CACHE_POSTS, JSON.stringify(cacheSafe)); }
+  catch(e) { console.warn('Cache full, skipping localStorage:', e.message); }
 }
 
 async function _doLoadPosts() {
@@ -817,26 +1027,40 @@ async function _doLoadPosts() {
   if (lblL) lblL.textContent = t('latest');
   if (lblR) lblR.textContent = t('refresh');
 
-  // Fetch posts from API, fall back to cache
-  let posts = [];
+  // Reset pagination state — this is always a "fresh load from page 1"
+  _nextCursor = null;
+  _hasMorePosts = false;
+  _feedRenderIndex = 0;
+  _renderedPosts = [];
+
+  let pinned = [];
+  let page = { posts: [], hasMore: false };
   let fromCache = false;
+
   try {
     if (API.isConfigured()) {
-      posts = await API.get('/api/posts');
-      // P8: Strip base64 data URLs before caching (they overflow 5MB localStorage limit)
-      const cacheSafe = posts.map(p => ({
-        ...p,
-        media: (p.media || []).map(m => ({
-          ...m,
-          url: (m.url && m.url.startsWith('data:')) ? '' : m.url
-        })).filter(m => m.url)
-      }));
-      try { localStorage.setItem(CACHE_POSTS, JSON.stringify(cacheSafe)); }
-      catch(e) { console.warn('Cache full, skipping localStorage:', e.message); }
+      // Fetch pinned (small, unpaginated) + first page of regular posts in parallel
+      const [pinnedResp, pageResp] = await Promise.all([
+        API.get('/api/posts/pinned').catch(() => []),
+        API.get(`/api/posts?${buildFeedQuery()}`)
+      ]);
+      pinned = Array.isArray(pinnedResp) ? pinnedResp : [];
+      page = pageResp || { posts: [], hasMore: false };
+
+      // Apply current filter/search to pinned client-side (small dataset, safe)
+      if (activeFilter !== 'all') pinned = pinned.filter(p => p.tag === activeFilter);
+      if (catQuery) {
+        const q = catQuery.toLowerCase();
+        pinned = pinned.filter(p =>
+          (p.tag && p.tag.toLowerCase().includes(q)) ||
+          (p.text && p.text.toLowerCase().includes(q)) ||
+          (p.tagEmoji && p.tagEmoji.includes(q))
+        );
+      }
     } else {
-      posts = getCachedPosts();
+      const cached = getCachedPosts();
       fromCache = true;
-      if (!posts.length) {
+      if (!cached.length) {
         feed.innerHTML = `<div class="empty-state">
           <div class="e-icon">📡</div>
           <p style="margin-bottom:12px">No server connected yet.</p>
@@ -844,128 +1068,42 @@ async function _doLoadPosts() {
         </div>`;
         return;
       }
+      pinned = cached.filter(p => p.pinned);
+      page = { posts: cached.filter(p => !p.pinned), hasMore: false };
     }
   } catch (e) {
     console.warn('Failed to fetch posts:', e.message);
-    posts = getCachedPosts();
+    const cached = getCachedPosts();
+    pinned = cached.filter(p => p.pinned);
+    page = { posts: cached.filter(p => !p.pinned), hasMore: false };
     fromCache = true;
     showStatusBanner('warn', '⚠ Offline — showing cached posts');
   }
 
-  // Fetch categories
+  _hasMorePosts = page.hasMore;
+  if (page.posts.length) _nextCursor = page.posts[page.posts.length - 1].id;
+
+  // Fetch categories (small, cached separately)
   const cats = await fetchCats();
   _cachedCats = cats;
+  renderCatPills(cats);
 
-  // Apply filters
-  if (activeFilter !== 'all') posts = posts.filter(p => p.tag === activeFilter);
-  if (catQuery) {
-    const q = catQuery.toLowerCase();
-    posts = posts.filter(p =>
-      (p.tag  && p.tag.toLowerCase().includes(q)) ||
-      (p.text && p.text.toLowerCase().includes(q)) ||
-      (p.tagEmoji && p.tagEmoji.includes(q))
-    );
-  }
+  const allPosts = [...pinned, ...page.posts];
+  _renderedPosts = allPosts;
 
-  // Render pills
-  renderCatPills(cats, getCachedPosts());
-
-  if (!posts.length) {
+  if (!allPosts.length) {
     const msg = catQuery ? `${t('noResult')} "<strong>${escapeHtml(catQuery)}</strong>"` : t('nopost');
     feed.innerHTML = `<div class="empty-state"><div class="e-icon">${catQuery?'🔍':'📡'}</div><p>${msg}</p></div>`;
     return;
   }
 
-  // Translate if needed
   const needsTr = lang !== 'en';
   if (needsTr && !fromCache) feed.innerHTML = `<div class="empty-state"><div class="e-icon" style="font-size:24px">⏳</div><p style="font-size:13px">Translating…</p></div>`;
 
-  const sorted = [...posts].sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0));
-  const translations = await Promise.all(
-    sorted.map(p => needsTr ? translateText(p.text, lang) : Promise.resolve(p.text))
-  );
-
   feed.innerHTML = '';
-  sorted.forEach((post, i) => {
-    // ── IN-FEED AD: inject after every 3rd post ──
-    // Replace the <ins> tag content with your real AdSense in-feed ad code
-    if (i > 0 && i % 3 === 0) {
-      const adCard = document.createElement('div');
-      adCard.className = 'infeed-ad';
-      adCard.setAttribute('aria-label', 'Advertisement');
-      adCard.innerHTML = `
-        <div class="infeed-ad-label">📢 Advertisement</div>
-        <!-- REPLACE THIS COMMENT WITH YOUR ADSENSE IN-FEED AD CODE:
-        <ins class="adsbygoogle"
-          style="display:block"
-          data-ad-format="fluid"
-          data-ad-layout-key="-fb+5w+4e-db+86"
-          data-ad-client="ca-pub-7714449427310539"
-          data-ad-slot="XXXXXXXXXX"></ins>
-        <script>(adsbygoogle = window.adsbygoogle || []).push({});<\/script>
-        -->`;
-      feed.appendChild(adCard);
-    }
-    const bm = bookmarks.includes(post.id);
-    const body = translations[i] || '';
-    const didTranslate = needsTr && body && body !== post.text;
-    const userId = getUserId();
-
-    const mediaHTML = (post.media || []).map(m => {
-      const mt = m.type || '';
-      const safeUrl = safeMediaUrl(m.url);
-      if (!safeUrl) return '';
-      if (mt === 'gif')           return `<div class="media-wrap"><img class="card-gif" src="${escapeHtml(safeUrl)}" alt="GIF" loading="lazy"></div>`;
-      if (mt.startsWith('image')) return `<div class="media-wrap"><img class="card-img" src="${escapeHtml(safeUrl)}" alt="" loading="lazy"></div>`;
-      if (mt.startsWith('video')) return `<div class="media-wrap"><video class="card-video" src="${escapeHtml(safeUrl)}" controls preload="metadata" playsinline webkit-playsinline></video></div>`;
-      return '';
-    }).join('');
-
-    const rxns = post.reactions || {};
-    const rxnHTML = buildReactionPillsHTML(post.id, rxns);
-
-    const card = document.createElement('article');
-    card.className = 'post-card' + (post.pinned ? ' is-pinned' : '');
-    card.id = 'post-' + post.id;
-    const replyHTML = post.replyTo ? (() => {
-      const r = post.replyTo;
-      const preview = (r.text || '(media)').slice(0, 100);
-      return `<div class="reply-quote" data-action="scroll-to" data-pid="${r.id}">
-        <div class="rq-bar"></div>
-        <div class="rq-body">
-          <div class="rq-tag">${escapeHtml(r.tagEmoji||'')} ${escapeHtml(r.tag)}</div>
-          <div class="rq-text">${escapeHtml(preview)}</div>
-        </div>
-      </div>`;
-    })() : '';
-
-    const editedBadge = post.editedAt ? `<span class="edited-badge">edited</span>` : '';
-
-    card.innerHTML = `
-      ${post.pinned ? `<div class="pin-lbl">📌 ${t('pinned')}</div>` : ''}
-      <div class="card-head">
-        <div class="ch-avatar" aria-hidden="true"><img src="submark.png" alt="Quickgeo"></div>
-        <div class="ch-meta">
-          <div class="ch-name">Quickgeo ${editedBadge}</div>
-          <div class="ch-time"><time>${escapeHtml(post.date)}</time> · ${escapeHtml(post.time)}</div>
-        </div>
-        <span class="tag-badge">${escapeHtml(post.tagEmoji||'')} ${escapeHtml(post.tag)}</span>
-      </div>
-      ${replyHTML}
-      ${body ? `<div class="card-body">${escapeHtml(body)}</div>` : ''}
-      ${didTranslate ? `<div class="tr-bar">🌐 ${t('trFrom')}</div>` : ''}
-      ${mediaHTML}
-      <div class="react-row" role="group">
-        ${rxnHTML}
-        <button type="button" class="r-add" data-action="picker" data-pid="${post.id}">${t('addR')}</button>
-      </div>
-      <div id="ps-${post.id}"></div>
-      <div class="act-row">
-        <button type="button" class="act-btn${bm?' saved':''}" data-action="bookmark" data-pid="${post.id}">${bm?t('saved'):t('save')}</button>
-        <button type="button" class="act-btn" id="s-${post.id}" data-action="share" data-pid="${post.id}">${t('share')}</button>
-      </div>`;
-    feed.appendChild(card);
-  });
+  await renderPostBatch(feed, allPosts, needsTr, fromCache);
+  renderLoadMoreButton(feed);
+  updateOfflineCache();
 }
 
 /* ════════════════════════════
@@ -1081,6 +1219,9 @@ let _sseReloadTimer = null;
         // after things settle — avoids repeated full-feed rebuilds for every viewer
         clearTimeout(_sseReloadTimer);
         _sseReloadTimer = setTimeout(() => {
+          // Skip if user has scrolled down into loaded pages — a reset-reload
+          // would silently discard everything past page 1
+          if (window.scrollY > 150) return;
           const saved = window.scrollY;
           loadPosts().then(() => requestAnimationFrame(() => window.scrollTo({ top: saved, behavior: 'instant' })));
         }, 400);
@@ -1129,9 +1270,12 @@ loadPosts().then(() => {
   connectSSE(); // posts now update in real-time via SSE
 });
 
-// Fallback poll every 60s only if SSE is not available
+// Fallback poll every 60s only if SSE is not available.
+// Skip if user has scrolled down / loaded extra pages — a reset-reload
+// would silently discard everything past page 1, which is jarring.
 setInterval(async () => {
   if (_sse && _sse.readyState === EventSource.OPEN) return; // SSE working — skip
+  if (window.scrollY > 150) return; // user is reading further down — don't disrupt
   const saved = window.scrollY;
   await loadPosts();
   requestAnimationFrame(() => window.scrollTo({ top: saved, behavior: 'instant' }));
