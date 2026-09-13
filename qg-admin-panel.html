@@ -232,6 +232,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
     </button>
     <button class="icon-btn" id="themeBtn" onclick="toggleTheme()" aria-label="Toggle dark/light mode">🌙</button>
     <a href="index.html" class="user-link" target="_blank" rel="noopener">↗ View Site</a>
+    <button class="user-link" onclick="logoutAllDevices()" title="Emergency: sign out all devices" style="cursor:pointer;background:none;color:var(--text3);border-color:var(--border);font-size:11px">🔒 All devices</button>
     <button class="user-link" onclick="logout()" style="cursor:pointer;background:none;color:var(--red,#e24b4a);border-color:var(--red,#e24b4a)">⏻ Logout</button>
   </div>
 </header>
@@ -411,6 +412,21 @@ function redirectToLogin() {
 
 async function logout() {
   try { await API.post('/api/logout', {}, true); } catch {}
+  sessionStorage.removeItem('qg_token');
+  sessionStorage.removeItem('qg_server');
+  window.location.href = './qg-secure-login.html';
+}
+
+/* Security emergency: invalidate ALL active sessions on ALL devices —
+   use if a device with admin access is lost/stolen or a token may have leaked */
+async function logoutAllDevices() {
+  if (!confirm('This will log out ALL devices currently signed in, including this one. Continue?')) return;
+  try {
+    const result = await API.post('/api/logout-all', {}, true);
+    alert(`✓ ${result.invalidated} session(s) invalidated. You will need to log in again.`);
+  } catch (e) {
+    alert(`Failed: ${e.message}`);
+  }
   sessionStorage.removeItem('qg_token');
   sessionStorage.removeItem('qg_server');
   window.location.href = './qg-secure-login.html';
