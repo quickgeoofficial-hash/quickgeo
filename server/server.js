@@ -28,6 +28,8 @@ CREATE TABLE IF NOT EXISTS categories(id INTEGER PRIMARY KEY AUTOINCREMENT,emoji
 CREATE TABLE IF NOT EXISTS sessions(token TEXT PRIMARY KEY,expires INTEGER NOT NULL);
 CREATE INDEX IF NOT EXISTS idx_posts_pinned_id ON posts(pinned DESC, id DESC);
 CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires);
+CREATE INDEX IF NOT EXISTS idx_posts_tag ON posts(tag);
+CREATE INDEX IF NOT EXISTS idx_posts_id_pinned0 ON posts(id DESC) WHERE pinned = 0;
 `);
 const DEFAULT_CATS=[{emoji:'🔴',name:'Breaking'},{emoji:'🗺',name:'Maps'},{emoji:'🛰',name:'Satellite'},{emoji:'🌐',name:'OSM'},{emoji:'📊',name:'Data'},{emoji:'✨',name:'Feature'},{emoji:'🔄',name:'Update'}];
 if(db.prepare('SELECT COUNT(*) as n FROM categories').get().n===0){const ins=db.prepare('INSERT OR IGNORE INTO categories (emoji,name) VALUES (?,?)');DEFAULT_CATS.forEach(c=>ins.run(c.emoji,c.name));console.log('✅  Default categories seeded');}
@@ -37,8 +39,26 @@ if(db.prepare('SELECT COUNT(*) as n FROM categories').get().n===0){const ins=db.
   if(fs.existsSync(cf)){try{const cats=JSON.parse(fs.readFileSync(cf,'utf8'));const ins=db.prepare('INSERT OR IGNORE INTO categories(emoji,name) VALUES(?,?)');cats.forEach(c=>ins.run(c.emoji||'📌',c.name));fs.renameSync(cf,cf+'.migrated');console.log('✅  Migrated categories');}catch(e){console.warn('⚠️  categories.json migration:',e.message);}}
 })();
 function parsePost(r){return{...r,media:JSON.parse(r.media||'[]'),replyTo:r.replyTo?JSON.parse(r.replyTo):null,reactions:JSON.parse(r.reactions||'{}'),reactUsers:JSON.parse(r.reactUsers||'{}'),pinned:!!r.pinned};}
-const stmtAll=db.prepare('SELECT * FROM posts ORDER BY pinned DESC, id DESC');
-const getPosts=()=>stmtAll.all().map(parsePost);
+const stmtPinned=db.prepare('SELECT * FROM posts WHERE pinned = 1 ORDER BY id DESC');
+const getPinnedPosts=()=>stmtPinned.all().map(parsePost);
+/* Paginated, filterable fetch of NON-pinned posts — this is what scales to lakhs of rows.
+   before: cursor (post id) — return posts with id < before
+   limit:  page size, capped at 100
+   category: exact tag match
+   search: substring match on text/tag (case-insensitive via LIKE + COLLATE NOCASE default) */
+function getPostsPage({before, limit, category, search}) {
+  limit = Math.min(Math.max(parseInt(limit)||20, 1), 100);
+  let sql = 'SELECT * FROM posts WHERE pinned = 0';
+  const params = [];
+  if (before) { sql += ' AND id < ?'; params.push(Number(before)); }
+  if (category) { sql += ' AND tag = ?'; params.push(category); }
+  if (search) { sql += ' AND (text LIKE ? OR tag LIKE ?)'; params.push(`%${search}%`, `%${search}%`); }
+  sql += ' ORDER BY id DESC LIMIT ?';
+  params.push(limit + 1); // fetch one extra to detect if there's a next page
+  const rows = db.prepare(sql).all(...params);
+  const hasMore = rows.length > limit;
+  return { posts: rows.slice(0, limit).map(parsePost), hasMore };
+}
 const getCats=()=>db.prepare('SELECT emoji,name FROM categories ORDER BY id').all();
 setInterval(()=>db.prepare('DELETE FROM sessions WHERE expires < ?').run(Date.now()),3600000);
 function createSession(){db.prepare('DELETE FROM sessions WHERE expires < ?').run(Date.now());const t=crypto.randomBytes(32).toString('hex');db.prepare('INSERT INTO sessions(token,expires) VALUES(?,?)').run(t,Date.now()+config.sessionHours*3600000);return t;}
@@ -92,13 +112,22 @@ app.use('/uploads',(req,res)=>{
   else{res.writeHead(200,{'Content-Length':size,'Content-Type':type,'Accept-Ranges':'bytes','Cache-Control':'public, max-age=86400'});fs.createReadStream(fp).pipe(res);}
 });
 function adminOnly(req,res,next){const auth=req.headers['authorization']||'',tok=auth.startsWith('Bearer ')?auth.slice(7):'';if(!isValidSession(tok))return res.status(401).json({error:'Session expired. Please log in again.'});next();}
-app.get('/health',(req,res)=>res.json({status:'ok',server:'Quickgeo',version:'3.1.0',time:new Date().toISOString(),posts:db.prepare('SELECT COUNT(*) as n FROM posts').get().n,clients:sseClients.size}));
+app.get('/health',(req,res)=>res.json({status:'ok',server:'Quickgeo',version:'3.2.0',time:new Date().toISOString(),posts:db.prepare('SELECT COUNT(*) as n FROM posts').get().n,clients:sseClients.size}));
 app.get('/api/stream',(req,res)=>{res.setHeader('Content-Type','text/event-stream');res.setHeader('Cache-Control','no-cache');res.setHeader('Connection','keep-alive');res.setHeader('X-Accel-Buffering','no');res.flushHeaders();res.write('data: {"type":"connected"}\n\n');sseClients.add(res);const hb=setInterval(()=>{try{res.write(': ping\n\n');}catch{}},25000);req.on('close',()=>{clearInterval(hb);sseClients.delete(res);});});
 app.post('/api/upload',adminOnly,rateLimit('upload',30,10*60000),upload.single('file'),(req,res)=>{if(!req.file)return res.status(400).json({error:'No file received'});const isImg=req.file.mimetype.startsWith('image/'),max=isImg?5*1024*1024:50*1024*1024;if(req.file.size>max){fs.unlinkSync(req.file.path);return res.status(400).json({error:`Too large. Max ${isImg?'5MB images':'50MB video'}.`});}const protocol=req.headers['x-forwarded-proto']||req.protocol,host=req.headers['x-forwarded-host']||req.get('host'),url=`${protocol}://${host}/uploads/${req.file.filename}`;console.log(`[UPLOAD] ${req.file.filename} (${(req.file.size/1024/1024).toFixed(2)} MB)`);res.json({url,filename:req.file.filename,size:req.file.size,type:req.file.mimetype});});
 app.post('/api/login',rateLimit('login',5,15*60000),(req,res)=>{const{username,password}=req.body||{};if(username===config.adminUsername&&password===config.adminPassword){const tok=createSession();console.log(`[AUTH] Login OK: ${username}`);return res.json({token:tok,expiresIn:`${config.sessionHours}h`});}console.log(`[AUTH] Failed: ${username||'(blank)'}`);setTimeout(()=>res.status(401).json({error:'Invalid username or password.'}),1200);});
 app.post('/api/logout',(req,res)=>{const auth=req.headers['authorization']||'',tok=auth.startsWith('Bearer ')?auth.slice(7):'';db.prepare('DELETE FROM sessions WHERE token=?').run(tok);res.json({ok:true});});
 app.get('/api/me',adminOnly,(req,res)=>res.json({ok:true,role:'admin'}));
-app.get('/api/posts',(req,res)=>{const posts=getPosts().map(({reactUsers,...p})=>p);res.json(posts);});
+app.get('/api/posts',(req,res)=>{
+  const { before, limit, category, search } = req.query;
+  const { posts, hasMore } = getPostsPage({ before, limit, category, search: search ? String(search).slice(0,100) : null });
+  const safe = posts.map(({reactUsers,...p})=>p);
+  res.json({ posts: safe, hasMore });
+});
+app.get('/api/posts/pinned',(req,res)=>{
+  const pinned = getPinnedPosts().map(({reactUsers,...p})=>p);
+  res.json(pinned);
+});
 app.post('/api/posts',adminOnly,(req,res)=>{
   const{tag,tagEmoji,text,media,replyTo}=req.body;if(!tag)return res.status(400).json({error:'tag is required'});
   let sRT=null;if(replyTo&&typeof replyTo==='object'){const rid=Number(replyTo.id);if(rid)sRT={id:rid,text:String(replyTo.text||'').slice(0,200),tag:String(replyTo.tag||''),tagEmoji:String(replyTo.tagEmoji||'')};}
@@ -125,7 +154,7 @@ app.post('/api/categories',adminOnly,(req,res)=>{const{emoji,name}=req.body||{};
 app.delete('/api/categories/:name',adminOnly,(req,res)=>{const r=db.prepare('DELETE FROM categories WHERE name=?').run(decodeURIComponent(req.params.name));if(r.changes===0)return res.status(404).json({error:'Category not found'});res.json({ok:true});});
 app.listen(config.port,'0.0.0.0',()=>{
   console.log('\n╔══════════════════════════════════╗');
-  console.log('║   Quickgeo Server v3.1 Running   ║');
+  console.log('║   Quickgeo Server v3.2 Running   ║');
   console.log('╚══════════════════════════════════╝');
   console.log(`\n✅  Port     → ${config.port}`);
   console.log(`👤  Username → ${config.adminUsername}`);
