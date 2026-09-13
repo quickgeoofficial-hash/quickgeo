@@ -592,6 +592,27 @@ const _reactInFlight = new Set();
 const VALID_EMOJIS = new Set(EMOJIS);
 const UID_RE = /^u_[A-Za-z0-9_-]{6,126}$/;
 
+/* ── Build reaction pill HTML for a post (reusable — avoids duplicating markup) ── */
+function buildReactionPillsHTML(postId, reactions) {
+  return Object.entries(reactions || {})
+    .filter(([, n]) => n > 0)
+    .map(([e, n]) => {
+      const on = !!userReacts[`${postId}_${e}`];
+      return `<button type="button" class="r-btn${on?' on':''}" data-pid="${postId}" data-emoji="${escapeHtml(e)}" aria-label="React ${escapeHtml(e)}"><span>${escapeHtml(e)}</span><span class="n">${n}</span></button>`;
+    }).join('');
+}
+
+/* ── Patch just ONE post's reaction row in the DOM — no full feed rebuild ── */
+function patchPostReactions(postId, reactions) {
+  const card = document.getElementById('post-' + postId);
+  if (!card) return false; // post not currently rendered — caller should fall back to full reload
+  const row = card.querySelector('.react-row');
+  if (!row) return false;
+  const addBtn = row.querySelector('.r-add');
+  row.innerHTML = buildReactionPillsHTML(postId, reactions) + (addBtn ? addBtn.outerHTML : '');
+  return true;
+}
+
 async function react(postId, emoji) {
   // Validate postId
   if (!postId || typeof postId !== 'number' || !Number.isFinite(postId)) return;
@@ -606,14 +627,6 @@ async function react(postId, emoji) {
   if (_reactInFlight.has(guardKey)) return;
   _reactInFlight.add(guardKey);
 
-  // Save scroll position — loadPosts() rebuilds the DOM which resets scroll
-  const savedScroll = window.scrollY;
-
-  function restoreScroll() {
-    // Use requestAnimationFrame to restore after DOM repaint
-    requestAnimationFrame(() => window.scrollTo({ top: savedScroll, behavior: 'instant' }));
-  }
-
   try {
     if (API.isConfigured()) {
       const data = await API.post(`/api/posts/${postId}/react`, { emoji, userId });
@@ -624,8 +637,16 @@ async function react(postId, emoji) {
         delete userReacts[guardKey];
       }
       saveReacts();
-      await loadPosts();
-      restoreScroll(); // ← restore after reload
+      // PERFORMANCE FIX: patch only this post's reaction row instead of
+      // rebuilding the entire feed (was causing lag with many posts —
+      // every image/video re-rendered + every event re-bound on every click)
+      const patched = patchPostReactions(postId, data.reactions);
+      if (!patched) {
+        // Post not in current DOM (rare) — fall back to full reload
+        const saved = window.scrollY;
+        await loadPosts();
+        requestAnimationFrame(() => window.scrollTo({ top: saved, behavior: 'instant' }));
+      }
       return;
     }
   } catch (e) { console.warn('React API error:', e.message); }
@@ -633,7 +654,7 @@ async function react(postId, emoji) {
     _reactInFlight.delete(guardKey); // always release guard
   }
 
-  // Offline fallback: update cache
+  // Offline fallback: update cache + patch DOM directly (no full reload needed)
   const posts = getCachedPosts();
   const post = posts.find(p => p.id === postId);
   if (!post) return;
@@ -649,8 +670,12 @@ async function react(postId, emoji) {
   }
   localStorage.setItem(CACHE_POSTS, JSON.stringify(posts));
   saveReacts();
-  await loadPosts();
-  restoreScroll(); // ← restore after offline reload too
+  const patched = patchPostReactions(postId, post.reactions);
+  if (!patched) {
+    const saved = window.scrollY;
+    await loadPosts();
+    requestAnimationFrame(() => window.scrollTo({ top: saved, behavior: 'instant' }));
+  }
 }
 
 function getCachedPosts() {
@@ -897,12 +922,7 @@ async function _doLoadPosts() {
     }).join('');
 
     const rxns = post.reactions || {};
-    const rxnHTML = Object.entries(rxns)
-      .filter(([, n]) => n > 0)
-      .map(([e, n]) => {
-        const on = !!userReacts[`${post.id}_${e}`];
-        return `<button type="button" class="r-btn${on?' on':''}" data-pid="${post.id}" data-emoji="${escapeHtml(e)}" aria-label="React ${escapeHtml(e)}"><span>${escapeHtml(e)}</span><span class="n">${n}</span></button>`;
-      }).join('');
+    const rxnHTML = buildReactionPillsHTML(post.id, rxns);
 
     const card = document.createElement('article');
     card.className = 'post-card' + (post.pinned ? ' is-pinned' : '');
@@ -1052,12 +1072,18 @@ function connectSSE() {
 
   _sse.onopen = () => { _sseRetries = 0; };
 
+let _sseReloadTimer = null;
   _sse.onmessage = (e) => {
     try {
       const data = JSON.parse(e.data);
       if (data.type === 'new_post' || data.type === 'update_post' || data.type === 'delete_post') {
-        const saved = window.scrollY;
-        loadPosts().then(() => requestAnimationFrame(() => window.scrollTo({ top: saved, behavior: 'instant' })));
+        // Debounce: if admin pins/edits several posts quickly, only reload once
+        // after things settle — avoids repeated full-feed rebuilds for every viewer
+        clearTimeout(_sseReloadTimer);
+        _sseReloadTimer = setTimeout(() => {
+          const saved = window.scrollY;
+          loadPosts().then(() => requestAnimationFrame(() => window.scrollTo({ top: saved, behavior: 'instant' })));
+        }, 400);
       }
     } catch {}
   };
