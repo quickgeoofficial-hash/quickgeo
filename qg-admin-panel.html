@@ -866,19 +866,107 @@ async function togglePin(id) {
   }
 
   try {
-    const result = await API.patch(`/api/posts/${id}/pin`);
-    // Update cache to match server truth
-    if (cachedPost) cachedPost.pinned = result.pinned;
-    // Pinned posts move to top — only re-render if sort order actually changed
-    // (avoids full DOM rebuild for the common case of pinning/unpinning near the top already)
-    const needsReorder = _cachedPosts.some((p, i) => {
-      const sorted = [..._cachedPosts].sort((a,b) => (b.pinned?1:0)-(a.pinned?1:0));
-      return sorted[i]?.id !== p.id;
-    });
-    if (needsReorder) renderAdminFeed(); // only full-rebuild when order actually changes
+    await API.patch(`/api/posts/${id}/pin`);
+    // Pin/unpin moves the post between the "pinned" section and the paginated
+    // regular section — with pagination this is a structural change, not just
+    // a reorder, so a full refresh is the simplest correct approach here.
+    // (renderAdminFeed only reloads the first page, bounded to ~20-40 posts —
+    // cheap even at lakhs scale, unlike the old full-table reload.)
+    renderAdminFeed();
   } catch (e) {
     showToast(`❌ ${e.message}`, 'err');
     renderAdminFeed(); // revert optimistic UI by re-fetching real state on error
+  }
+}
+
+/* ── Pagination state (admin feed) ── */
+let _adminNextCursor = null;
+let _adminHasMore = false;
+let _adminPinned = [];
+
+function createAdminPostCardElement(post) {
+  const card = document.createElement('div');
+  card.className = 'pcard';
+  card.id = 'post-' + post.id;
+
+  const rxnHTML = Object.entries(post.reactions || {})
+    .filter(([,n]) => n > 0)
+    .map(([e,n]) => `<span class="rpill">${escapeHtml(e)} ${Number(n)||0}</span>`)
+    .join('');
+
+  const mediaHTML = (post.media || []).map(m => {
+    const mt = m.type || '';
+    const safeUrl = safeMediaUrl(m.url);
+    if (!safeUrl) return '';
+    if (mt === 'gif' || mt.startsWith('image')) return `<img class="pmedia" src="${escapeHtml(safeUrl)}" alt="" loading="lazy">`;
+    if (mt.startsWith('video')) return `<video class="pmedia" src="${escapeHtml(safeUrl)}" controls preload="metadata"></video>`;
+    return '';
+  }).join('');
+
+  card.innerHTML = `
+    ${post.pinned ? '<div class="ppin-lbl">📌 Pinned</div>' : ''}
+    <div class="pcard-hd">
+      <span class="ptag">${escapeHtml(post.tagEmoji||'')} ${escapeHtml(post.tag)}</span>
+      <span class="ptime">${escapeHtml(post.date)} · ${escapeHtml(post.time)}</span>
+    </div>
+    ${post.text ? `<div class="pbody">${escapeHtml(post.text)}</div>` : ''}
+    ${mediaHTML}
+    ${rxnHTML ? `<div class="preacts">${rxnHTML}</div>` : ''}
+    <div class="pactions">
+      <button class="act-reply" data-action="reply" data-pid="${post.id}">↩ Reply</button>
+      <button class="act-edit"  data-action="edit"  data-pid="${post.id}">✏️ Edit</button>
+      <button class="act-pin"   data-action="pin"   data-pid="${post.id}">${post.pinned?'📌 Unpin':'📌 Pin'}</button>
+      <button class="act-del"   data-action="del"   data-pid="${post.id}">🗑 Delete</button>
+    </div>`;
+  return card;
+}
+
+let _adminLoadMoreObserver = null;
+function renderAdminLoadMoreButton(feed) {
+  let btn = document.getElementById('adminLoadMoreBtn');
+  if (btn) { if (_adminLoadMoreObserver) _adminLoadMoreObserver.disconnect(); btn.remove(); }
+  if (!_adminHasMore) return;
+  btn = document.createElement('button');
+  btn.id = 'adminLoadMoreBtn';
+  btn.style.cssText = 'display:block;margin:14px auto;padding:8px 20px;background:var(--green-light);color:var(--green);border:1px solid var(--green);border-radius:8px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:13px;';
+  btn.textContent = '↓ Load more posts';
+  btn.onclick = loadMoreAdminPosts;
+  feed.appendChild(btn);
+
+  if ('IntersectionObserver' in window) {
+    _adminLoadMoreObserver = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting) loadMoreAdminPosts();
+    }, { rootMargin: '400px' });
+    _adminLoadMoreObserver.observe(btn);
+  }
+}
+
+let _adminLoadMoreLock = false;
+async function loadMoreAdminPosts() {
+  if (_adminLoadMoreLock || !_adminHasMore || !API.isOk()) return;
+  _adminLoadMoreLock = true;
+  const feed = document.getElementById('adminFeed');
+  const btn  = document.getElementById('adminLoadMoreBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Loading…'; }
+
+  try {
+    const params = new URLSearchParams({ limit: '20' });
+    if (_adminNextCursor) params.set('before', _adminNextCursor);
+    const resp = await API.get(`/api/posts?${params.toString()}`);
+    const posts = resp.posts || [];
+    _adminHasMore = resp.hasMore || false;
+    if (posts.length) _adminNextCursor = posts[posts.length - 1].id;
+
+    _cachedPosts = _cachedPosts.concat(posts);
+    const countEl = document.getElementById('postCount');
+    if (countEl) countEl.textContent = `${_cachedPosts.length} post${_cachedPosts.length !== 1 ? 's' : ''}${_adminHasMore ? '+' : ''}`;
+
+    posts.forEach(post => feed.insertBefore(createAdminPostCardElement(post), document.getElementById('adminLoadMoreBtn')));
+  } catch (e) {
+    console.warn('loadMoreAdminPosts failed:', e.message);
+  } finally {
+    _adminLoadMoreLock = false;
+    renderAdminLoadMoreButton(feed);
   }
 }
 
@@ -896,53 +984,29 @@ async function renderAdminFeed() {
     return;
   }
 
-  try {
-    const posts = await API.get('/api/posts');
-    _cachedPosts = posts; // cache for edit/reply lookups
-    if (countEl) countEl.textContent = `${posts.length} post${posts.length !== 1 ? 's' : ''}`;
+  // Reset pagination state — always a fresh load from page 1
+  _adminNextCursor = null;
+  _adminHasMore = false;
 
-    if (!posts.length) { feed.innerHTML = '<div class="empty-msg">No posts yet. Publish your first update!</div>'; return; }
+  try {
+    const [pinnedResp, pageResp] = await Promise.all([
+      API.get('/api/posts/pinned').catch(() => []),
+      API.get('/api/posts?limit=20')
+    ]);
+    _adminPinned = Array.isArray(pinnedResp) ? pinnedResp : [];
+    const page = pageResp || { posts: [], hasMore: false };
+    _adminHasMore = page.hasMore;
+    if (page.posts.length) _adminNextCursor = page.posts[page.posts.length - 1].id;
+
+    _cachedPosts = [..._adminPinned, ...page.posts]; // cache for edit/reply/pin lookups
+    const totalKnown = _cachedPosts.length;
+    if (countEl) countEl.textContent = `${totalKnown} post${totalKnown !== 1 ? 's' : ''}${_adminHasMore ? '+' : ''}`;
+
+    if (!_cachedPosts.length) { feed.innerHTML = '<div class="empty-msg">No posts yet. Publish your first update!</div>'; return; }
 
     feed.innerHTML = '';
-    [...posts].sort((a,b) => (b.pinned?1:0) - (a.pinned?1:0)).forEach(post => {
-      const card = document.createElement('div');
-      card.className = 'pcard';
-      card.id = 'post-' + post.id;
-
-      // Reactions — escape emoji and count
-      const rxnHTML = Object.entries(post.reactions || {})
-        .filter(([,n]) => n > 0)
-        .map(([e,n]) => `<span class="rpill">${escapeHtml(e)} ${Number(n)||0}</span>`)
-        .join('');
-
-      // Media — validate protocol before inserting into src
-      const mediaHTML = (post.media || []).map(m => {
-        const mt = m.type || '';
-        const safeUrl = safeMediaUrl(m.url);
-        if (!safeUrl) return '';
-        if (mt === 'gif' || mt.startsWith('image')) return `<img class="pmedia" src="${escapeHtml(safeUrl)}" alt="" loading="lazy">`;
-        if (mt.startsWith('video')) return `<video class="pmedia" src="${escapeHtml(safeUrl)}" controls preload="metadata"></video>`;
-        return '';
-      }).join('');
-
-      // post.id is numeric (Date.now()) — use data-pid instead of inline onclick
-      card.innerHTML = `
-        ${post.pinned ? '<div class="ppin-lbl">📌 Pinned</div>' : ''}
-        <div class="pcard-hd">
-          <span class="ptag">${escapeHtml(post.tagEmoji||'')} ${escapeHtml(post.tag)}</span>
-          <span class="ptime">${escapeHtml(post.date)} · ${escapeHtml(post.time)}</span>
-        </div>
-        ${post.text ? `<div class="pbody">${escapeHtml(post.text)}</div>` : ''}
-        ${mediaHTML}
-        ${rxnHTML ? `<div class="preacts">${rxnHTML}</div>` : ''}
-        <div class="pactions">
-          <button class="act-reply" data-action="reply" data-pid="${post.id}">↩ Reply</button>
-          <button class="act-edit"  data-action="edit"  data-pid="${post.id}">✏️ Edit</button>
-          <button class="act-pin"   data-action="pin"   data-pid="${post.id}">${post.pinned?'📌 Unpin':'📌 Pin'}</button>
-          <button class="act-del"   data-action="del"   data-pid="${post.id}">🗑 Delete</button>
-        </div>`;
-      feed.appendChild(card);
-    });
+    _cachedPosts.forEach(post => feed.appendChild(createAdminPostCardElement(post)));
+    renderAdminLoadMoreButton(feed);
   } catch (e) {
     feed.innerHTML = `<div class="empty-msg" style="color:var(--red)">⚠ Could not load posts.<br><small>${escapeHtml(e.message)}</small></div>`;
   }
