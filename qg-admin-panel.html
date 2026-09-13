@@ -845,10 +845,41 @@ async function confirmDelete(id, btn) {
 
 async function togglePin(id) {
   if (!API.isOk()) { openServerModal(); return; }
+
+  const card = document.getElementById('post-' + id);
+  const btn  = card?.querySelector('[data-action="pin"]');
+  const cachedPost = _cachedPosts.find(p => p.id === id);
+
+  // Optimistic UI: flip the button text/label immediately, before server responds
+  const willBePinned = cachedPost ? !cachedPost.pinned : null;
+  if (btn && willBePinned !== null) {
+    btn.textContent = willBePinned ? '📌 Unpin' : '📌 Pin';
+  }
+  let pinLabel = card?.querySelector('.ppin-lbl');
+  if (willBePinned && !pinLabel && card) {
+    pinLabel = document.createElement('div');
+    pinLabel.className = 'ppin-lbl';
+    pinLabel.textContent = '📌 Pinned';
+    card.prepend(pinLabel);
+  } else if (!willBePinned && pinLabel) {
+    pinLabel.remove();
+  }
+
   try {
-    await API.patch(`/api/posts/${id}/pin`);
-    renderAdminFeed();
-  } catch (e) { showToast(`❌ ${e.message}`, 'err'); }
+    const result = await API.patch(`/api/posts/${id}/pin`);
+    // Update cache to match server truth
+    if (cachedPost) cachedPost.pinned = result.pinned;
+    // Pinned posts move to top — only re-render if sort order actually changed
+    // (avoids full DOM rebuild for the common case of pinning/unpinning near the top already)
+    const needsReorder = _cachedPosts.some((p, i) => {
+      const sorted = [..._cachedPosts].sort((a,b) => (b.pinned?1:0)-(a.pinned?1:0));
+      return sorted[i]?.id !== p.id;
+    });
+    if (needsReorder) renderAdminFeed(); // only full-rebuild when order actually changes
+  } catch (e) {
+    showToast(`❌ ${e.message}`, 'err');
+    renderAdminFeed(); // revert optimistic UI by re-fetching real state on error
+  }
 }
 
 async function renderAdminFeed() {
@@ -876,6 +907,7 @@ async function renderAdminFeed() {
     [...posts].sort((a,b) => (b.pinned?1:0) - (a.pinned?1:0)).forEach(post => {
       const card = document.createElement('div');
       card.className = 'pcard';
+      card.id = 'post-' + post.id;
 
       // Reactions — escape emoji and count
       const rxnHTML = Object.entries(post.reactions || {})
