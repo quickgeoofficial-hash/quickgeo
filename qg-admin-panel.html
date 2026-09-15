@@ -1077,15 +1077,12 @@ async function renderCatList() {
   if (!cats.length) { list.innerHTML = '<div style="text-align:center;color:var(--text3);font-size:13px;padding:12px">No categories yet.</div>'; return; }
   list.innerHTML = '';
   cats.forEach((cat) => {
-    const isDef = DEFAULT_CATS.some(d => d.name === cat.name);
     const item = document.createElement('div');
     item.className = 'cat-item';
     item.innerHTML = `
       <span class="cat-item-icon">${escapeHtml(cat.emoji)}</span>
       <span class="cat-item-name">${escapeHtml(cat.name)}</span>
-      ${isDef
-        ? '<span class="cat-item-def">default</span>'
-        : `<button class="cat-rm" data-category="${escapeHtml(cat.name)}" aria-label="Remove category">Remove</button>`}`;
+      <button class="cat-rm" data-category="${escapeHtml(cat.name)}" aria-label="Remove category">Remove</button>`;
     list.appendChild(item);
   });
 }
