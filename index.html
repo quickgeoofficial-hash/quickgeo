@@ -227,6 +227,18 @@ footer span { font-size: 12px; color: var(--text3); }
 .infeed-ad-label { font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 6px; display: flex; align-items: center; gap: 4px; }
 .infeed-ad ins { display: block; width: 100%; }
 
+/* Side menu drawer */
+.side-menu-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 300; opacity: 0; pointer-events: none; transition: opacity 0.25s ease; }
+.side-menu-overlay.open { opacity: 1; pointer-events: auto; }
+.side-menu { position: fixed; top: 0; left: 0; bottom: 0; width: 260px; max-width: 82vw; background: var(--surface); z-index: 301; transform: translateX(-100%); transition: transform 0.25s ease; box-shadow: 4px 0 24px rgba(0,0,0,0.2); display: flex; flex-direction: column; }
+.side-menu.open { transform: translateX(0); }
+.sm-header { display: flex; align-items: center; justify-content: space-between; padding: 16px; border-bottom: 1px solid var(--border); }
+.sm-logo { display: flex; align-items: center; gap: 8px; font-family: 'Syne', sans-serif; font-size: 17px; font-weight: 700; }
+.sm-links { display: flex; flex-direction: column; padding: 8px 0; flex: 1; }
+.sm-link { display: flex; align-items: center; gap: 10px; padding: 13px 18px; font-size: 14px; color: var(--text); text-decoration: none; transition: background 0.15s; }
+.sm-link:hover { background: var(--bg); }
+.sm-footer { padding: 14px 18px; font-size: 11px; color: var(--text3); border-top: 1px solid var(--border); }
+
 /* ── RESPONSIVE ── */
 @media (max-width: 900px) { .ad-col { width: 120px; } }
 @media (max-width: 700px) { .ad-col { display: none; } .cat-search:focus, .cat-search.has-val { width: 120px; } }
@@ -248,6 +260,7 @@ footer span { font-size: 12px; color: var(--text3); }
 
 <!-- Topbar -->
 <header class="topbar">
+  <button class="icon-btn" id="menuBtn" onclick="openSideMenu()" aria-label="Open menu" style="margin-right:2px">☰</button>
   <a class="logo" href="#" aria-label="Quickgeo home">
     <div class="logo-dot"></div><img src="submark.png" alt="Quickgeo" class="logo-img"> Quickgeo
     <span class="live-badge" aria-label="Live">● LIVE</span>
@@ -277,6 +290,21 @@ footer span { font-size: 12px; color: var(--text3); }
     <button class="icon-btn" id="themeBtn" onclick="toggleTheme()" aria-label="Toggle dark/light mode">🌙</button>
   </nav>
 </header>
+
+<!-- Side menu drawer -->
+<div class="side-menu-overlay" id="sideMenuOverlay" onclick="closeSideMenu()"></div>
+<nav class="side-menu" id="sideMenu" aria-label="Site menu" aria-hidden="true">
+  <div class="sm-header">
+    <div class="sm-logo"><img src="submark.png" alt="Quickgeo" class="logo-img"> Quickgeo</div>
+    <button class="icon-btn" onclick="closeSideMenu()" aria-label="Close menu">✕</button>
+  </div>
+  <div class="sm-links">
+    <a href="about.html" class="sm-link">📰 About</a>
+    <a href="contact.html" class="sm-link">✉️ Contact</a>
+    <a href="privacy.html" class="sm-link">🔒 Privacy Policy</a>
+  </div>
+  <div class="sm-footer">© 2026 Quickgeo. All rights reserved.</div>
+</nav>
 
 <!-- Page body: fixed ad cols + scrolling feed -->
 <div class="page-body">
@@ -344,12 +372,8 @@ footer span { font-size: 12px; color: var(--text3); }
 </div>
 
 <!-- Footer — required for AdSense approval -->
-<footer>
-  <span>© 2026 Quickgeo. All rights reserved.</span>
-  <a href="privacy.html">Privacy Policy</a>
-  <a href="about.html">About</a>
-  <a href="contact.html">Contact</a>
-</footer>
+<!-- Footer content moved to side menu (☰) since infinite-scroll feeds
+     make the page bottom unreachable — see #sideMenu above -->
 
 <script>
 'use strict';
@@ -431,6 +455,24 @@ function applyTheme(t, save) {
   if (save) localStorage.setItem('qg_theme', t);
 }
 function toggleTheme() { applyTheme(currentTheme === 'dark' ? 'light' : 'dark', true); }
+
+/* ── SIDE MENU (drawer for About / Contact / Privacy — footer content,
+   kept reachable without scrolling since the feed uses infinite scroll) ── */
+function openSideMenu() {
+  document.getElementById('sideMenu').classList.add('open');
+  document.getElementById('sideMenuOverlay').classList.add('open');
+  document.getElementById('sideMenu').setAttribute('aria-hidden', 'false');
+  document.body.style.overflow = 'hidden'; // prevent background scroll while drawer open
+}
+function closeSideMenu() {
+  document.getElementById('sideMenu').classList.remove('open');
+  document.getElementById('sideMenuOverlay').classList.remove('open');
+  document.getElementById('sideMenu').setAttribute('aria-hidden', 'true');
+  document.body.style.overflow = '';
+}
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeSideMenu();
+});
 
 /* ════════════════════════════
    LANGUAGE
