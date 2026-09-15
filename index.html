@@ -129,7 +129,8 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .ch-meta { flex: 1; min-width: 0; }
 .ch-name { font-size: 13px; font-weight: 500; color: var(--text); }
 .ch-time { font-size: 11px; color: var(--text3); }
-.tag-badge { font-size: 11px; font-weight: 500; color: var(--green-dark); background: var(--green-light); border-radius: 4px; padding: 2px 7px; white-space: nowrap; flex-shrink: 0; }
+.tag-badge { font-size: 11px; font-weight: 500; color: var(--green-dark); background: var(--green-light); border-radius: 4px; padding: 2px 7px; white-space: nowrap; flex-shrink: 0; border: none; cursor: pointer; font-family: 'DM Sans', sans-serif; transition: opacity 0.15s; }
+.tag-badge:hover { opacity: 0.75; }
 [data-theme="dark"] .tag-badge { color: #5DCAA5; }
 .card-body { padding: 9px 14px 11px; font-size: 14px; line-height: 1.68; color: var(--text); word-break: break-word; white-space: pre-wrap; }
 .tr-bar { font-size: 11px; color: var(--green-dark); background: var(--green-light); padding: 3px 10px; margin: 0 14px 8px; border-radius: 5px; display: flex; align-items: center; gap: 4px; }
@@ -777,6 +778,21 @@ document.addEventListener('click', e => {
   }
 });
 
+/* ── TAG BADGE CLICK-TO-FILTER: clicking a post's category badge filters the feed ── */
+document.addEventListener('click', e => {
+  const btn = e.target.closest('[data-action="filter-tag"][data-tag]');
+  if (!btn) return;
+  const tag = btn.dataset.tag;
+  if (!tag) return;
+  activeFilter = tag;
+  catQuery = ''; // clear any active search so the filter is visible/unambiguous
+  const searchInput = document.getElementById('catSearch');
+  if (searchInput) { searchInput.value = ''; searchInput.classList.remove('has-val'); }
+  loadPosts();
+  // Scroll up to the category pills so the user sees which filter is now active
+  document.getElementById('catPills')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+});
+
 /* ── POST ACTION EVENT DELEGATION (picker / bookmark / share) ── */
 document.addEventListener('click', e => {
   const btn = e.target.closest('[data-action][data-pid]');
@@ -889,7 +905,7 @@ function createPostCardElement(post, body, didTranslate) {
         <div class="ch-name">Quickgeo ${editedBadge}</div>
         <div class="ch-time"><time>${escapeHtml(post.date)}</time> · ${escapeHtml(post.time)}</div>
       </div>
-      <span class="tag-badge">${escapeHtml(post.tagEmoji||'')} ${escapeHtml(post.tag)}</span>
+      <button type="button" class="tag-badge" data-action="filter-tag" data-tag="${escapeHtml(post.tag)}">${escapeHtml(post.tagEmoji||'')} ${escapeHtml(post.tag)}</button>
     </div>
     ${replyHTML}
     ${body ? `<div class="card-body">${escapeHtml(body)}</div>` : ''}
