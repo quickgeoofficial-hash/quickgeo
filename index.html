@@ -51,6 +51,11 @@
   --amber: #f5b942; --shadow: 0 1px 3px rgba(0,0,0,0.3);
 }
 
+/* ── BASE ── */
+html { scroll-behavior: smooth; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; display: flex; flex-direction: column; transition: background 0.25s, color 0.25s; }
+
+/* ── TOPBAR ── */
 .topbar { background: var(--surface); border-bottom: 1px solid var(--border); box-shadow: var(--shadow); padding: 0 16px; height: 56px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 200; flex-shrink: 0; }
 .logo { font-family: 'Syne', sans-serif; font-size: 18px; font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 7px; text-decoration: none; }
 .logo-dot { display: none; } /* replaced by submark image */
@@ -59,11 +64,11 @@
 .live-badge { font-size: 10px; font-weight: 600; background: var(--red-bg); color: var(--red-text); border-radius: 20px; padding: 2px 8px; letter-spacing: 0.05em; }
 .topbar-right { display: flex; align-items: center; gap: 7px; }
 
-
+/* Theme toggle */
 .icon-btn { width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--border2); background: var(--surface2); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 15px; transition: background 0.15s; flex-shrink: 0; }
 .icon-btn:hover { background: var(--border2); }
 
-
+/* Language dropdown */
 .lang-wrap { position: relative; }
 .lang-btn { display: flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 500; color: var(--text2); background: var(--surface2); border: 1px solid var(--border2); border-radius: 8px; padding: 5px 10px; cursor: pointer; font-family: 'DM Sans', sans-serif; white-space: nowrap; }
 .lang-btn:hover { border-color: var(--green); color: var(--green); }
@@ -89,19 +94,19 @@
 /* "Advertisement" label — required by AdSense policy */
 .ad-label { font-size: 9px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.07em; padding: 4px 0 0; }
 
-
+/* ── SCROLLABLE FEED CENTER ── */
 .feed-col { flex: 1; overflow-y: auto; overflow-x: hidden; min-width: 0; }
 .feed-col::-webkit-scrollbar { width: 5px; }
 .feed-col::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
 .feed-inner { max-width: 680px; margin: 0 auto; padding: 20px 14px 48px; display: flex; flex-direction: column; gap: 14px; }
 
-
+/* Feed header row */
 .feed-hdr { display: flex; align-items: center; justify-content: space-between; }
 .feed-hdr h2 { font-family: 'Syne', sans-serif; font-size: 11px; font-weight: 600; color: var(--text3); letter-spacing: 0.08em; text-transform: uppercase; }
 .refresh-btn { font-size: 12px; color: var(--green); background: var(--green-light); border: none; border-radius: 6px; padding: 5px 11px; cursor: pointer; font-family: 'DM Sans', sans-serif; transition: opacity 0.15s; }
 .refresh-btn:hover { opacity: 0.8; }
 
-
+/* Category filter + inline search row */
 .cat-row { display: flex; align-items: center; gap: 8px; }
 .cat-search { flex-shrink: 0; width: 34px; height: 30px; border-radius: 15px; border: 1px solid var(--border2); background: var(--surface2); color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 13px; outline: none; padding: 0 10px 0 28px; cursor: pointer; transition: width 0.22s ease, border-color 0.18s; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='13' height='13' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2.5'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.35-4.35'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: 9px center; }
 .cat-search::placeholder { color: transparent; }
@@ -113,7 +118,7 @@
 .pill:hover { border-color: var(--green); color: var(--green); }
 .pill.active { background: var(--green); border-color: var(--green); color: #fff; }
 
-
+/* ── POST CARD ── */
 .post-card { background: var(--surface); border-radius: 14px; border: 1px solid var(--border); overflow: hidden; box-shadow: var(--shadow); transition: border-color 0.15s, box-shadow 0.15s; }
 .post-card:hover { border-color: var(--border2); box-shadow: 0 3px 12px rgba(0,0,0,0.08); }
 .post-card.is-pinned { border-left: 3px solid var(--amber); }
@@ -135,7 +140,7 @@
 .card-video { width: 100%; height: auto; max-height: 640px; display: block; background: #000; object-fit: contain; }
 .card-gif { width: 100%; max-height: 260px; object-fit: contain; display: block; background: var(--surface2); }
 
-
+/* Video play overlay — shown until playback starts, avoids looking "broken" while loading */
 .video-play-overlay {
   position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
   width: 58px; height: 58px; border-radius: 50%;
@@ -145,7 +150,7 @@
 }
 .video-play-overlay.hide { opacity: 0; visibility: hidden; }
 
-
+/* Reactions */
 .react-row { padding: 8px 14px; display: flex; flex-wrap: wrap; gap: 5px; align-items: center; border-top: 1px solid var(--border); }
 .r-btn { display: flex; align-items: center; gap: 4px; border: 1px solid var(--border2); border-radius: 20px; padding: 3px 10px; background: var(--surface2); cursor: pointer; font-size: 13px; color: var(--text2); transition: all 0.13s; font-family: 'DM Sans', sans-serif; }
 .r-btn:hover { border-color: var(--green); background: var(--green-light); }
@@ -158,7 +163,7 @@
 .ep { width: 32px; height: 32px; border-radius: 7px; border: 1px solid var(--border); background: var(--surface2); cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; }
 .ep:hover { background: var(--green-light); border-color: var(--green); }
 
-
+/* Actions */
 .act-row { padding: 0 14px 11px; display: flex; gap: 7px; }
 .act-btn { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--text2); background: var(--surface2); border: 1px solid var(--border); border-radius: 7px; padding: 5px 11px; cursor: pointer; font-family: 'DM Sans', sans-serif; transition: all 0.14s; }
 .act-btn:hover { border-color: var(--border2); color: var(--text); }
@@ -166,12 +171,12 @@
 [data-theme="dark"] .act-btn.saved { background: rgba(239,159,39,0.11); }
 .act-btn.copied { color: var(--green); border-color: var(--green); background: var(--green-light); }
 
-
+/* Empty */
 .empty-state { text-align: center; padding: 56px 20px; color: var(--text3); }
 .empty-state .e-icon { font-size: 42px; margin-bottom: 10px; }
 .empty-state p { font-size: 14px; }
 
-
+/* ── INSTALL POPUP ── */
 .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.48); z-index: 600; display: flex; align-items: center; justify-content: center; padding: 20px; }
 .install-box { background: var(--surface); border-radius: 20px; padding: 28px 24px; max-width: 340px; width: 100%; text-align: center; border: 1px solid var(--border2); box-shadow: 0 20px 60px rgba(0,0,0,0.22); animation: popIn 0.3s cubic-bezier(0.34,1.56,0.64,1); }
 @keyframes popIn { from{opacity:0;transform:scale(0.86)} to{opacity:1;transform:scale(1)} }
@@ -187,16 +192,16 @@
 .ib-skip { font-size: 13px; color: var(--text3); background: none; border: none; cursor: pointer; font-family: 'DM Sans', sans-serif; }
 .ib-skip:hover { color: var(--text2); }
 
-
+/* ── FOOTER ── */
 footer { flex-shrink: 0; background: var(--surface); border-top: 1px solid var(--border); padding: 14px 20px; display: flex; align-items: center; justify-content: center; gap: 20px; flex-wrap: wrap; }
 footer a { font-size: 12px; color: var(--text3); text-decoration: none; }
 footer a:hover { color: var(--text2); text-decoration: underline; }
 footer span { font-size: 12px; color: var(--text3); }
 
-
+/* Feed tagline */
 .feed-tagline { font-size: 12px; color: var(--text3); margin-top: 2px; }
 
-
+/* Skeleton loading cards */
 .skeleton-card { background: var(--surface); border-radius: 14px; border: 1px solid var(--border); padding: 16px; margin-bottom: 12px; }
 .skel-line { background: linear-gradient(90deg, var(--border) 25%, var(--bg) 50%, var(--border) 75%); background-size: 200% 100%; border-radius: 6px; animation: shimmer 1.4s infinite; }
 .skel-tag  { height: 10px; width: 60px; margin-bottom: 10px; }
@@ -204,7 +209,7 @@ footer span { font-size: 12px; color: var(--text3); }
 .skel-txt2 { height: 13px; width: 75%; }
 @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
 
-
+/* Reply quote (Telegram style) */
 .reply-quote { display: flex; gap: 0; margin-bottom: 8px; border-radius: 8px; overflow: hidden; background: var(--bg); cursor: pointer; transition: opacity 0.15s; }
 .reply-quote:hover { opacity: 0.8; }
 .rq-bar { width: 3px; background: var(--green); flex-shrink: 0; }
@@ -213,16 +218,16 @@ footer span { font-size: 12px; color: var(--text3); }
 .rq-text { font-size: 12px; color: var(--text2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .edited-badge { font-size: 10px; color: var(--text3); font-weight: 400; font-family: 'DM Sans', sans-serif; margin-left: 4px; }
 
-
+/* Highlighted post when opened via shared link */
 .post-card.highlight-target { border-color: var(--green); box-shadow: 0 0 0 2px var(--green-light), var(--shadow); animation: highlightPulse 2s ease forwards; }
 @keyframes highlightPulse { 0%{border-color:var(--green)} 60%{border-color:var(--green)} 100%{border-color:var(--border)} }
 
-
+/* In-feed ad card — shown between posts on all screen sizes */
 .infeed-ad { background: var(--surface); border-radius: 14px; border: 1px solid var(--border); overflow: hidden; box-shadow: var(--shadow); padding: 10px; }
 .infeed-ad-label { font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 6px; display: flex; align-items: center; gap: 4px; }
 .infeed-ad ins { display: block; width: 100%; }
 
-
+/* Side menu drawer */
 .side-menu-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 300; opacity: 0; pointer-events: none; transition: opacity 0.25s ease; }
 .side-menu-overlay.open { opacity: 1; pointer-events: auto; }
 .side-menu { position: fixed; top: 0; left: 0; bottom: 0; width: 260px; max-width: 82vw; background: var(--surface); z-index: 301; transform: translateX(-100%); transition: transform 0.25s ease; box-shadow: 4px 0 24px rgba(0,0,0,0.2); display: flex; flex-direction: column; }
@@ -234,14 +239,14 @@ footer span { font-size: 12px; color: var(--text3); }
 .sm-link:hover { background: var(--bg); }
 .sm-footer { padding: 14px 18px; font-size: 11px; color: var(--text3); border-top: 1px solid var(--border); }
 
-
+/* ── RESPONSIVE ── */
 @media (max-width: 900px) { .ad-col { width: 120px; } }
 @media (max-width: 700px) { .ad-col { display: none; } .cat-search:focus, .cat-search.has-val { width: 120px; } }
 </style>
 </head>
 <body>
 
-
+<!-- Install overlay -->
 <div class="overlay" id="installOverlay" style="display:none" role="dialog" aria-modal="true" aria-label="Add to home screen">
   <div class="install-box">
     <div class="ib-icon"><img src="submark.png" alt="Quickgeo" style="width:64px;height:64px;object-fit:contain;border-radius:14px;"></div>
@@ -253,7 +258,7 @@ footer span { font-size: 12px; color: var(--text3); }
   </div>
 </div>
 
-
+<!-- Topbar -->
 <header class="topbar">
   <button class="icon-btn" id="menuBtn" onclick="openSideMenu()" aria-label="Open menu" style="margin-right:2px">☰</button>
   <a class="logo" href="#" aria-label="Quickgeo home">
@@ -261,7 +266,7 @@ footer span { font-size: 12px; color: var(--text3); }
     <span class="live-badge" aria-label="Live">● LIVE</span>
   </a>
   <nav class="topbar-right" aria-label="Site controls">
-  
+    <!-- Language -->
     <div class="lang-wrap">
       <button class="lang-btn" id="langBtn" onclick="toggleLang()" aria-haspopup="listbox" aria-expanded="false">
         🌐 <span id="langLabel">EN</span> ▾
@@ -279,14 +284,14 @@ footer span { font-size: 12px; color: var(--text3); }
         <div class="lang-item" onclick="setLang('pt','PT','Português',this)" role="option">🇧🇷 Português</div>
       </div>
     </div>
- 
+    <!-- Add to Home Screen -->
     <button id="addHomeBtn" onclick="triggerInstall()" aria-label="Add to Home Screen" style="display:none;padding:5px 10px;background:var(--green-light);color:var(--green);border:1px solid var(--green);border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;gap:4px;align-items:center">📲 Install</button>
-    
+    <!-- Theme -->
     <button class="icon-btn" id="themeBtn" onclick="toggleTheme()" aria-label="Toggle dark/light mode">🌙</button>
   </nav>
 </header>
 
-
+<!-- Side menu drawer -->
 <div class="side-menu-overlay" id="sideMenuOverlay" onclick="closeSideMenu()"></div>
 <nav class="side-menu" id="sideMenu" aria-label="Site menu" aria-hidden="true">
   <div class="sm-header">
@@ -301,7 +306,7 @@ footer span { font-size: 12px; color: var(--text3); }
   <div class="sm-footer">© 2026 Quickgeo. All rights reserved.</div>
 </nav>
 
-
+<!-- Page body: fixed ad cols + scrolling feed -->
 <div class="page-body">
 
   <!-- LEFT AD -->
@@ -326,7 +331,7 @@ footer span { font-size: 12px; color: var(--text3); }
     </div>
   </aside>
 
-
+  <!-- SCROLLABLE FEED -->
   <main class="feed-col" id="feedCol">
     <div class="feed-inner">
       <div class="feed-hdr">
@@ -337,19 +342,19 @@ footer span { font-size: 12px; color: var(--text3); }
         <button class="refresh-btn" id="lblRefresh" onclick="loadPosts()">↻ Refresh</button>
       </div>
 
-  
+      <!-- Category filter row -->
       <div class="cat-row">
         <input class="cat-search" id="catSearch" placeholder="Filter…" autocomplete="off"
           oninput="onCatInput(this)" onblur="onCatBlur(this)" aria-label="Filter categories">
         <div class="cat-pills" id="catPills" role="list" aria-label="Category filters"></div>
       </div>
 
-     
+      <!-- Posts -->
       <div id="postFeed" aria-live="polite"></div>
     </div>
   </main>
 
-  
+  <!-- RIGHT AD -->
   <aside class="ad-col right" aria-label="Advertisement">
     <div class="ad-slot">
       <div class="ad-placeholder">
@@ -366,6 +371,9 @@ footer span { font-size: 12px; color: var(--text3); }
 
 </div>
 
+<!-- Footer — required for AdSense approval -->
+<!-- Footer content moved to side menu (☰) since infinite-scroll feeds
+     make the page bottom unreachable — see #sideMenu above -->
 
 <script>
 'use strict';
@@ -373,13 +381,13 @@ footer span { font-size: 12px; color: var(--text3); }
 /* ════════════════════════════
    SERVER CONFIG
 ════════════════════════════ */
-
+// Auto-configure from ?server= URL param (admin shares this link)
 (function () {
   const params = new URLSearchParams(location.search);
   const s = params.get('server');
   if (s) {
     localStorage.setItem('qg_server', s.replace(/\/$/, ''));
-   
+    // Clean URL without reloading
     history.replaceState({}, '', location.pathname);
   }
 })();
@@ -405,24 +413,24 @@ const API = {
   }
 };
 
-
+// Unique user ID for reactions (persists in localStorage)
 function getUserId() {
   const UID_RE = /^u_[A-Za-z0-9_-]{6,126}$/;
   let id = localStorage.getItem('qg_uid');
-
+  // Validate stored ID — regenerate if missing, wrong format, or fails server pattern
   if (!id || !UID_RE.test(id)) {
-    
-    const ts  = Date.now().toString(36);                       
-    const rnd = Math.random().toString(36).slice(2)             
-              + Math.random().toString(36).slice(2);            
+    // Combine timestamp (base36) + sufficient random bytes for uniqueness + min length
+    const ts  = Date.now().toString(36);                        // ~8 chars
+    const rnd = Math.random().toString(36).slice(2)             // ~10 chars
+              + Math.random().toString(36).slice(2);            // extra safety
     id = 'u_' + ts + rnd;
-    id = id.slice(0, 64); 
+    id = id.slice(0, 64); // cap at 64 chars, well within 128
     localStorage.setItem('qg_uid', id);
   }
   return id;
 }
 
-
+// Cache keys (for offline fallback)
 const CACHE_POSTS = 'qg_cache_posts';
 const CACHE_CATS  = 'qg_cache_cats';
 const BM_KEY      = 'qg_bookmarks';
@@ -448,7 +456,8 @@ function applyTheme(t, save) {
 }
 function toggleTheme() { applyTheme(currentTheme === 'dark' ? 'light' : 'dark', true); }
 
-
+/* ── SIDE MENU (drawer for About / Contact / Privacy — footer content,
+   kept reachable without scrolling since the feed uses infinite scroll) ── */
 function openSideMenu() {
   document.getElementById('sideMenu').classList.add('open');
   document.getElementById('sideMenuOverlay').classList.add('open');
@@ -513,7 +522,7 @@ document.addEventListener('click', e => {
   }
 });
 
-
+// Restore saved lang
 if (lang !== 'en') {
   document.getElementById('langLabel').textContent = langCode;
   document.documentElement.lang = lang;
@@ -554,7 +563,7 @@ async function fetchCats() {
       return cats;
     }
   } catch (e) { console.warn('Could not fetch categories:', e.message); }
-  
+  // Fallback to cache or defaults
   try { return JSON.parse(localStorage.getItem(CACHE_CATS) || '[]') || DEFAULT_CATS; }
   catch { return DEFAULT_CATS; }
 }
@@ -568,7 +577,7 @@ function onCatInput(inp) {
   catQuery = inp.value.trim().toLowerCase();
   inp.classList.toggle('has-val', catQuery.length > 0);
   activeFilter = 'all';
- 
+  // Debounce: search now hits the server, don't fire a request per keystroke
   clearTimeout(_catInputDebounce);
   _catInputDebounce = setTimeout(() => loadPosts(), 350);
 }
@@ -584,7 +593,11 @@ function renderCatPills(cats) {
   allBtn.onclick = () => { activeFilter = 'all'; loadPosts(); };
   wrap.appendChild(allBtn);
 
-
+  // Show ALL categories (small dedicated table) — do NOT filter by "used in
+  // currently loaded page" since with pagination only a fraction of posts
+  // are ever loaded at once; filtering by that would make pills randomly
+  // appear/disappear as pages load. Category filtering itself happens
+  // server-side via the ?category= param.
   cats
     .filter(c => !catQuery || c.name.toLowerCase().includes(catQuery) || c.emoji.includes(catQuery))
     .forEach(cat => {
@@ -607,7 +620,7 @@ let activePicker = null;
 function saveBM()     { localStorage.setItem(BM_KEY, JSON.stringify(bookmarks)); }
 function saveReacts() { localStorage.setItem(REACTS_KEY, JSON.stringify(userReacts)); }
 
-
+/* ── PRIORITY 5: HTML escape to prevent XSS ── */
 function escapeHtml(str) {
   if (!str) return '';
   return String(str)
@@ -618,26 +631,27 @@ function escapeHtml(str) {
     .replace(/'/g, '&#039;');
 }
 
-
+/* ── MEDIA URL PROTOCOL VALIDATION (issue 1) ── */
+// Only allow http: and https: — reject javascript:, data:, vbscript:, blob:, etc.
 function safeMediaUrl(url) {
   if (!url || typeof url !== 'string') return null;
   try {
     const parsed = new URL(url);
     if (parsed.protocol === 'https:' || parsed.protocol === 'http:') return url;
-    return null; 
+    return null; // reject any other protocol
   } catch {
-    return null; 
+    return null; // unparseable — reject
   }
 }
 
-
+/* ── In-flight guard: prevents duplicate simultaneous requests for same post+emoji ── */
 const _reactInFlight = new Set();
 
-
+/* ── Client-side emoji allowlist (must match what server accepts) ── */
 const VALID_EMOJIS = new Set(EMOJIS);
 const UID_RE = /^u_[A-Za-z0-9_-]{6,126}$/;
 
-
+/* ── Build reaction pill HTML for a post (reusable — avoids duplicating markup) ── */
 function buildReactionPillsHTML(postId, reactions) {
   return Object.entries(reactions || {})
     .filter(([, n]) => n > 0)
@@ -647,10 +661,10 @@ function buildReactionPillsHTML(postId, reactions) {
     }).join('');
 }
 
-
+/* ── Patch just ONE post's reaction row in the DOM — no full feed rebuild ── */
 function patchPostReactions(postId, reactions) {
   const card = document.getElementById('post-' + postId);
-  if (!card) return false;
+  if (!card) return false; // post not currently rendered — caller should fall back to full reload
   const row = card.querySelector('.react-row');
   if (!row) return false;
   const addBtn = row.querySelector('.r-add');
@@ -659,15 +673,15 @@ function patchPostReactions(postId, reactions) {
 }
 
 async function react(postId, emoji) {
- 
+  // Validate postId
   if (!postId || typeof postId !== 'number' || !Number.isFinite(postId)) return;
-  
+  // Validate emoji against known set
   if (!VALID_EMOJIS.has(emoji)) return;
- 
+  // Validate userId format before sending
   const userId = getUserId();
   if (!UID_RE.test(userId)) return;
 
-  
+  // Duplicate-click guard: skip if this exact request is already in flight
   const guardKey = `${postId}_${emoji}`;
   if (_reactInFlight.has(guardKey)) return;
   _reactInFlight.add(guardKey);
@@ -675,17 +689,19 @@ async function react(postId, emoji) {
   try {
     if (API.isConfigured()) {
       const data = await API.post(`/api/posts/${postId}/react`, { emoji, userId });
-     
+      // Fix: data.reacted=true means now reacted, data.reacted=false means removed
       if (data.reacted) {
         userReacts[guardKey] = true;
       } else {
         delete userReacts[guardKey];
       }
       saveReacts();
-
+      // PERFORMANCE FIX: patch only this post's reaction row instead of
+      // rebuilding the entire feed (was causing lag with many posts —
+      // every image/video re-rendered + every event re-bound on every click)
       const patched = patchPostReactions(postId, data.reactions);
       if (!patched) {
-       
+        // Post not in current DOM (rare) — fall back to full reload
         const saved = window.scrollY;
         await loadPosts();
         requestAnimationFrame(() => window.scrollTo({ top: saved, behavior: 'instant' }));
@@ -697,7 +713,7 @@ async function react(postId, emoji) {
     _reactInFlight.delete(guardKey); // always release guard
   }
 
-  
+  // Offline fallback: update cache + patch DOM directly (no full reload needed)
   const posts = getCachedPosts();
   const post = posts.find(p => p.id === postId);
   if (!post) return;
@@ -728,7 +744,7 @@ function getCachedPosts() {
 
 function addEmoji(postId, emoji) {
   closePicker();
-  
+  // Validate emoji is from our known set before reacting
   if (!VALID_EMOJIS || !VALID_EMOJIS.has(emoji)) return;
   react(postId, emoji);
 }
@@ -741,10 +757,11 @@ function toggleBM(postId) {
 
 async function sharePost(postId) {
   const btn = document.getElementById('s-' + postId);
- 
+  // Use /post/:id route — Worker serves rich OG preview to bots,
+  // real users get redirected to /#post-:id automatically
   const url = `${location.origin}/post/${postId}`;
 
-  
+  // Try native share sheet first (Android/iOS)
   if (navigator.share) {
     try {
       await navigator.share({ title: 'Quickgeo', url });
@@ -754,7 +771,7 @@ async function sharePost(postId) {
     }
   }
 
-  
+  // Fallback: copy to clipboard
   try {
     if (navigator.clipboard) await navigator.clipboard.writeText(url);
   } catch {}
@@ -764,33 +781,33 @@ async function sharePost(postId) {
   }
 }
 
-
+/* ── VIDEO PLAY OVERLAY: hide play icon once video actually starts (play doesn't bubble, use capture) ── */
 document.addEventListener('play', (e) => {
   if (e.target.tagName !== 'VIDEO') return;
   const wrap = e.target.closest('.media-wrap');
   const overlay = wrap?.querySelector('.video-play-overlay');
   if (overlay) overlay.classList.add('hide');
-}, true); 
-  
+}, true); // capture phase — required since media events don't bubble
+
 document.addEventListener('pause', (e) => {
   if (e.target.tagName !== 'VIDEO') return;
   const wrap = e.target.closest('.media-wrap');
   const overlay = wrap?.querySelector('.video-play-overlay');
-  if (overlay) overlay.classList.remove('hide'); 
+  if (overlay) overlay.classList.remove('hide'); // show play icon again when paused
 }, true);
 
-
+/* ── REACTION EVENT DELEGATION (replaces inline onclick on r-btn) ── */
 document.addEventListener('click', e => {
   const btn = e.target.closest('.r-btn[data-pid][data-emoji]');
   if (btn) {
     const pid   = Number(btn.dataset.pid);
     const emoji = btn.dataset.emoji;
-    
+    // Validate before calling react(): numeric pid, emoji in known set
     if (pid && Number.isFinite(pid) && VALID_EMOJIS && VALID_EMOJIS.has(emoji)) react(pid, emoji);
   }
 });
 
-
+/* ── REPLY QUOTE DELEGATION: click quote → scroll to original post ── */
 document.addEventListener('click', e => {
   const q = e.target.closest('.reply-quote[data-pid]');
   if (!q) return;
@@ -803,27 +820,27 @@ document.addEventListener('click', e => {
   }
 });
 
-
+/* ── TAG BADGE CLICK-TO-FILTER: clicking a post's category badge filters the feed ── */
 document.addEventListener('click', e => {
   const btn = e.target.closest('[data-action="filter-tag"][data-tag]');
   if (!btn) return;
   const tag = btn.dataset.tag;
   if (!tag) return;
   activeFilter = tag;
-  catQuery = '';
+  catQuery = ''; // clear any active search so the filter is visible/unambiguous
   const searchInput = document.getElementById('catSearch');
   if (searchInput) { searchInput.value = ''; searchInput.classList.remove('has-val'); }
   loadPosts();
- 
+  // Scroll up to the category pills so the user sees which filter is now active
   document.getElementById('catPills')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 });
 
-
+/* ── POST ACTION EVENT DELEGATION (picker / bookmark / share) ── */
 document.addEventListener('click', e => {
   const btn = e.target.closest('[data-action][data-pid]');
   if (!btn) return;
   const pid = Number(btn.dataset.pid);
-  if (!pid) return;                   
+  if (!pid) return;                   // reject non-numeric or zero
   const action = btn.dataset.action;
   if (action === 'picker')   openPicker(pid);
   else if (action === 'bookmark') toggleBM(pid);
@@ -875,11 +892,11 @@ function showStatusBanner(type, msg) {
    LOAD POSTS (main render)
 ════════════════════════════ */
 let _loadLock = false;
-
-let _nextCursor = null;      
-let _hasMorePosts = false;   
-let _feedRenderIndex = 0;    
-let _pinnedCache = [];       
+/* ── Pagination state ── */
+let _nextCursor = null;      // last regular post id loaded — used as ?before= for next page
+let _hasMorePosts = false;   // does the server have more posts beyond what's loaded?
+let _feedRenderIndex = 0;    // running count of rendered posts, for ad placement across pages
+let _pinnedCache = [];       // small dataset, refetched on every reset
 
 async function loadPosts() {
   if (_loadLock) return;
@@ -887,7 +904,7 @@ async function loadPosts() {
   try { await _doLoadPosts(); } finally { _loadLock = false; }
 }
 
-
+/* Build one post card DOM node — reused for both initial render and "Load More" */
 function createPostCardElement(post, body, didTranslate) {
   const bm = bookmarks.includes(post.id);
 
@@ -948,7 +965,7 @@ function createPostCardElement(post, body, didTranslate) {
   return card;
 }
 
-
+/* Append an in-feed ad card at the current render index if due (every 3rd post) */
 function maybeInsertAd(feed) {
   if (_feedRenderIndex > 0 && _feedRenderIndex % 3 === 0) {
     const adCard = document.createElement('div');
@@ -969,7 +986,7 @@ function maybeInsertAd(feed) {
   }
 }
 
-
+/* Render a batch of posts into the feed, applying translation, ads, and card building */
 async function renderPostBatch(feed, posts, needsTr, fromCache) {
   const translations = await Promise.all(
     posts.map(p => needsTr ? translateText(p.text, lang) : Promise.resolve(p.text))
@@ -984,7 +1001,7 @@ async function renderPostBatch(feed, posts, needsTr, fromCache) {
   });
 }
 
-
+/* Show/update the "Load More" button at the bottom of the feed */
 let _loadMoreObserver = null;
 function renderLoadMoreButton(feed) {
   let btn = document.getElementById('loadMoreBtn');
@@ -998,17 +1015,18 @@ function renderLoadMoreButton(feed) {
   btn.onclick = loadMorePosts;
   feed.appendChild(btn);
 
- 
+  // Infinite scroll: auto-trigger when button scrolls near viewport
+  // (efficient — IntersectionObserver doesn't poll on every scroll event)
   if ('IntersectionObserver' in window) {
     _loadMoreObserver = new IntersectionObserver((entries) => {
       if (entries[0].isIntersecting) loadMorePosts();
-    }, { rootMargin: '400px' }); 
+    }, { rootMargin: '400px' }); // trigger 400px before it's actually visible
     _loadMoreObserver.observe(btn);
   }
 }
 
 let _loadMoreLock = false;
-
+/* Fetch and append the NEXT page — does not touch pinned section or existing posts */
 async function loadMorePosts() {
   if (_loadMoreLock || !_hasMorePosts || !API.isConfigured()) return;
   _loadMoreLock = true;
@@ -1026,7 +1044,7 @@ async function loadMorePosts() {
     _renderedPosts = _renderedPosts.concat(posts);
     const needsTr = lang !== 'en';
     await renderPostBatch(feed, posts, needsTr, false);
-    updateOfflineCache(); 
+    updateOfflineCache(); // extend cache with newly loaded posts
   } catch (e) {
     console.warn('loadMorePosts failed:', e.message);
   } finally {
@@ -1035,7 +1053,7 @@ async function loadMorePosts() {
   }
 }
 
-
+/* Build the query string for the current filter/search state */
 function buildFeedQuery({ before } = {}) {
   const params = new URLSearchParams();
   params.set('limit', '20');
@@ -1045,7 +1063,7 @@ function buildFeedQuery({ before } = {}) {
   return params.toString();
 }
 
-
+/* Track all currently-rendered posts (pinned + loaded pages) for offline cache + reaction lookups */
 let _renderedPosts = [];
 function updateOfflineCache() {
   const cacheSafe = _renderedPosts.map(p => ({
@@ -1067,7 +1085,7 @@ async function _doLoadPosts() {
   if (lblL) lblL.textContent = t('latest');
   if (lblR) lblR.textContent = t('refresh');
 
- 
+  // Reset pagination state — this is always a "fresh load from page 1"
   _nextCursor = null;
   _hasMorePosts = false;
   _feedRenderIndex = 0;
@@ -1079,7 +1097,7 @@ async function _doLoadPosts() {
 
   try {
     if (API.isConfigured()) {
-      
+      // Fetch pinned (small, unpaginated) + first page of regular posts in parallel
       const [pinnedResp, pageResp] = await Promise.all([
         API.get('/api/posts/pinned').catch(() => []),
         API.get(`/api/posts?${buildFeedQuery()}`)
@@ -1087,7 +1105,7 @@ async function _doLoadPosts() {
       pinned = Array.isArray(pinnedResp) ? pinnedResp : [];
       page = pageResp || { posts: [], hasMore: false };
 
-      
+      // Apply current filter/search to pinned client-side (small dataset, safe)
       if (activeFilter !== 'all') pinned = pinned.filter(p => p.tag === activeFilter);
       if (catQuery) {
         const q = catQuery.toLowerCase();
@@ -1123,7 +1141,7 @@ async function _doLoadPosts() {
   _hasMorePosts = page.hasMore;
   if (page.posts.length) _nextCursor = page.posts[page.posts.length - 1].id;
 
- 
+  // Fetch categories (small, cached separately)
   const cats = await fetchCats();
   _cachedCats = cats;
   renderCatPills(cats);
@@ -1152,7 +1170,7 @@ async function _doLoadPosts() {
 let deferredPrompt = null;
 window.addEventListener('beforeinstallprompt', e => {
   e.preventDefault(); deferredPrompt = e;
- 
+  // Show persistent topbar install button
   const topBtn = document.getElementById('addHomeBtn');
   if (topBtn) topBtn.style.display = 'inline-flex';
 });
@@ -1168,7 +1186,7 @@ function triggerInstall() {
       deferredPrompt = null;
     });
   } else {
-   
+    // iOS or desktop — show the instruction popup
     showInstallPopup();
   }
 }
@@ -1212,11 +1230,11 @@ function showInstallPopup() {
 }
 
 function dismissInstall() {
-  localStorage.setItem('qg_install_dismissed', Date.now()); 
+  localStorage.setItem('qg_install_dismissed', Date.now()); // suppress for 7 days
   document.getElementById('installOverlay').style.display = 'none';
 }
 
-
+// Show install button immediately on iOS (no beforeinstallprompt on Safari)
 if (/iPad|iPhone|iPod/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1)) {
   const topBtn = document.getElementById('addHomeBtn');
   if (topBtn) topBtn.style.display = 'inline-flex';
@@ -1255,10 +1273,12 @@ let _sseReloadTimer = null;
     try {
       const data = JSON.parse(e.data);
       if (data.type === 'new_post' || data.type === 'update_post' || data.type === 'delete_post') {
-       
+        // Debounce: if admin pins/edits several posts quickly, only reload once
+        // after things settle — avoids repeated full-feed rebuilds for every viewer
         clearTimeout(_sseReloadTimer);
         _sseReloadTimer = setTimeout(() => {
-          
+          // Skip if user has scrolled down into loaded pages — a reset-reload
+          // would silently discard everything past page 1
           if (window.scrollY > 150) return;
           const saved = window.scrollY;
           loadPosts().then(() => requestAnimationFrame(() => window.scrollTo({ top: saved, behavior: 'instant' })));
@@ -1269,7 +1289,7 @@ let _sseReloadTimer = null;
 
   _sse.onerror = () => {
     _sse.close(); _sse = null;
-    
+    // Exponential back-off: 3s, 6s, 12s, 24s, max 30s
     const delay = Math.min(3000 * Math.pow(2, _sseRetries), 30000);
     _sseRetries++;
     setTimeout(connectSSE, delay);
@@ -1299,32 +1319,35 @@ function scrollToLinkedPost() {
 /* ════════════════════════════
    INIT
 ════════════════════════════ */
-
+// Show skeleton cards immediately while posts load
 showSkeletons(3);
 
-
+// Initial load then connect SSE for real-time updates
 loadPosts().then(() => {
   scrollToLinkedPost();
-  connectSSE(); 
+  connectSSE(); // posts now update in real-time via SSE
 });
 
-
+// Fallback poll every 60s only if SSE is not available.
+// Skip if user has scrolled down / loaded extra pages — a reset-reload
+// would silently discard everything past page 1, which is jarring.
 setInterval(async () => {
-  if (_sse && _sse.readyState === EventSource.OPEN) return; 
-  if (window.scrollY > 150) return; 
+  if (_sse && _sse.readyState === EventSource.OPEN) return; // SSE working — skip
+  if (window.scrollY > 150) return; // user is reading further down — don't disrupt
   const saved = window.scrollY;
   await loadPosts();
   requestAnimationFrame(() => window.scrollTo({ top: saved, behavior: 'instant' }));
 }, 60000);
 
-
+// Delay install popup — only after 15s (let user read first)
+// Don't show again for 7 days after dismissal
 const _lastDismissed = Number(localStorage.getItem('qg_install_dismissed') || 0);
 const _daysSince = (Date.now() - _lastDismissed) / (1000 * 60 * 60 * 24);
 if (_daysSince > 7) {
   setTimeout(showInstallPopup, 15000);
 }
 
-
+// iOS — show topbar install button immediately
 if (/iPad|iPhone|iPod/.test(navigator.userAgent) ||
     (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1)) {
   const topBtn = document.getElementById('addHomeBtn');
