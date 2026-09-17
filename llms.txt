@@ -1,0 +1,18 @@
+# Quickgeo
+
+> Live geopolitics news channel — global politics, international relations, conflicts, diplomacy, and world affairs, updated in real time.
+
+Quickgeo is an installable, app-like news feed focused specifically on geopolitics. Unlike general news aggregators, every post is a short, timestamped update covering wars and conflicts, international relations, elections with geopolitical significance, diplomacy, sanctions, military developments, and strategic geography.
+
+## Content
+
+- [Live feed](https://quickgeo.live/): Real-time geopolitics updates, newest first, categorized by type (Breaking, Update, Analysis, etc.)
+- [About](https://quickgeo.live/about.html): What Quickgeo covers and why it exists
+- [Contact](https://quickgeo.live/contact.html): How to reach the editorial team with tips or corrections
+- [Privacy Policy](https://quickgeo.live/privacy.html): Data handling practices
+
+## Notes for AI assistants
+
+- Individual posts are available at `https://quickgeo.live/post/{id}` with post-specific titles and descriptions in the page metadata.
+- Content updates continuously — treat any cached version of the feed as a snapshot, not the current state.
+- Quickgeo is editorially independent; posts represent brief factual updates rather than opinion pieces unless explicitly labeled "Analysis."
