@@ -136,9 +136,23 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .tr-bar { font-size: 11px; color: var(--green-dark); background: var(--green-light); padding: 3px 10px; margin: 0 14px 8px; border-radius: 5px; display: flex; align-items: center; gap: 4px; }
 [data-theme="dark"] .tr-bar { color: #5DCAA5; }
 .media-wrap { background: var(--bg); position: relative; }
-.card-img { width: 100%; max-height: 340px; object-fit: contain; display: block; }
+.card-img { width: 100%; max-height: 340px; object-fit: contain; display: block; cursor: pointer; }
 .card-video { width: 100%; height: auto; max-height: 640px; display: block; background: #000; object-fit: contain; }
 .card-gif { width: 100%; max-height: 260px; object-fit: contain; display: block; background: var(--surface2); }
+
+/* Media grid — Telegram-style album layout for multi-photo/video posts */
+.media-grid { display: grid; gap: 2px; background: var(--bg); }
+.media-grid[data-count="1"] { grid-template-columns: 1fr; }
+.media-grid[data-count="2"] { grid-template-columns: 1fr 1fr; }
+.media-grid[data-count="3"] { grid-template-columns: 1fr 1fr; }
+.media-grid[data-count="3"] .grid-item:first-child { grid-row: span 2; }
+.media-grid[data-count="4"] { grid-template-columns: 1fr 1fr; }
+.media-grid[data-count="5"],
+.media-grid[data-count="6"] { grid-template-columns: 1fr 1fr 1fr; }
+.grid-item { position: relative; aspect-ratio: 1 / 1; overflow: hidden; cursor: pointer; background: #000; }
+.grid-item img, .grid-item video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.grid-item .gi-play { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); width: 34px; height: 34px; border-radius: 50%; background: rgba(0,0,0,0.6); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 14px; pointer-events: none; }
+.grid-item .gi-more { position: absolute; inset: 0; background: rgba(0,0,0,0.55); color: #fff; font-size: 22px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
 
 /* Video play overlay — shown until playback starts, avoids looking "broken" while loading */
 .video-play-overlay {
@@ -227,6 +241,19 @@ footer span { font-size: 12px; color: var(--text3); }
 .infeed-ad-label { font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 6px; display: flex; align-items: center; gap: 4px; }
 .infeed-ad ins { display: block; width: 100%; }
 
+/* Fullscreen media lightbox */
+.lightbox { position: fixed; inset: 0; background: #000; z-index: 500; display: flex; flex-direction: column; }
+.lb-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; flex-shrink: 0; }
+.lb-btn { background: rgba(255,255,255,0.1); border: none; color: #fff; width: 34px; height: 34px; border-radius: 50%; font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.lb-counter { color: #fff; font-size: 13px; font-family: 'DM Sans', sans-serif; opacity: 0.85; }
+.lb-stage { flex: 1; display: flex; align-items: center; justify-content: center; overflow: hidden; min-height: 0; }
+.lb-stage img, .lb-stage video { max-width: 100%; max-height: 100%; object-fit: contain; }
+.lb-nav { position: absolute; top: 50%; transform: translateY(-50%); background: rgba(0,0,0,0.4); border: none; color: #fff; width: 40px; height: 40px; border-radius: 50%; font-size: 22px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.lb-prev { left: 10px; } .lb-next { right: 10px; }
+.lb-thumbs { display: flex; gap: 6px; padding: 10px; overflow-x: auto; flex-shrink: 0; }
+.lb-thumb { width: 48px; height: 48px; border-radius: 6px; object-fit: cover; cursor: pointer; opacity: 0.5; flex-shrink: 0; border: 2px solid transparent; }
+.lb-thumb.active { opacity: 1; border-color: var(--green); }
+
 /* Side menu drawer */
 .side-menu-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 300; opacity: 0; pointer-events: none; transition: opacity 0.25s ease; }
 .side-menu-overlay.open { opacity: 1; pointer-events: auto; }
@@ -247,6 +274,19 @@ footer span { font-size: 12px; color: var(--text3); }
 <body>
 
 <!-- Install overlay -->
+<!-- Fullscreen media lightbox — Telegram-style viewer for photo/video albums -->
+<div class="lightbox" id="lightbox" style="display:none" role="dialog" aria-modal="true" aria-label="Media viewer">
+  <div class="lb-header">
+    <button class="lb-btn" onclick="closeLightbox()" aria-label="Close">←</button>
+    <div class="lb-counter" id="lbCounter"></div>
+    <div style="width:34px"></div>
+  </div>
+  <div class="lb-stage" id="lbStage"></div>
+  <button class="lb-nav lb-prev" onclick="lightboxPrev()" aria-label="Previous">‹</button>
+  <button class="lb-nav lb-next" onclick="lightboxNext()" aria-label="Next">›</button>
+  <div class="lb-thumbs" id="lbThumbs"></div>
+</div>
+
 <div class="overlay" id="installOverlay" style="display:none" role="dialog" aria-modal="true" aria-label="Add to home screen">
   <div class="install-box">
     <div class="ib-icon"><img src="submark.png" alt="Quickgeo" style="width:64px;height:64px;object-fit:contain;border-radius:14px;"></div>
@@ -820,6 +860,98 @@ document.addEventListener('click', e => {
   }
 });
 
+/* ── LIGHTBOX: fullscreen media viewer, Telegram-style album navigation ── */
+let _lbPostId = null;
+let _lbIndex = 0;
+
+document.addEventListener('click', e => {
+  const el = e.target.closest('[data-action="lightbox"][data-pid]');
+  if (!el) return;
+  const pid = Number(el.dataset.pid);
+  const idx = Number(el.dataset.idx) || 0;
+  if (!pid || !_postMediaRegistry[pid]) return;
+  openLightbox(pid, idx);
+});
+
+function openLightbox(postId, index) {
+  const media = _postMediaRegistry[postId];
+  if (!media || !media.length) return;
+  _lbPostId = postId;
+  _lbIndex = Math.max(0, Math.min(index, media.length - 1));
+  document.getElementById('lightbox').style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+  renderLightboxStage();
+}
+
+function closeLightbox() {
+  document.getElementById('lightbox').style.display = 'none';
+  document.getElementById('lbStage').innerHTML = ''; // stop any playing video
+  document.body.style.overflow = '';
+  _lbPostId = null;
+}
+
+function lightboxPrev() {
+  const media = _postMediaRegistry[_lbPostId];
+  if (!media) return;
+  _lbIndex = (_lbIndex - 1 + media.length) % media.length;
+  renderLightboxStage();
+}
+
+function lightboxNext() {
+  const media = _postMediaRegistry[_lbPostId];
+  if (!media) return;
+  _lbIndex = (_lbIndex + 1) % media.length;
+  renderLightboxStage();
+}
+
+function renderLightboxStage() {
+  const media = _postMediaRegistry[_lbPostId];
+  if (!media || !media[_lbIndex]) return;
+  const item = media[_lbIndex];
+  const stage = document.getElementById('lbStage');
+  const counter = document.getElementById('lbCounter');
+  const thumbs = document.getElementById('lbThumbs');
+
+  stage.innerHTML = item.type.startsWith('video')
+    ? `<video src="${escapeHtml(item.url)}" controls autoplay playsinline></video>`
+    : `<img src="${escapeHtml(item.url)}" alt="">`;
+
+  counter.textContent = media.length > 1 ? `${_lbIndex + 1} of ${media.length}` : '';
+
+  // Nav arrows only when there's more than one item
+  document.querySelector('.lb-prev').style.display = media.length > 1 ? 'flex' : 'none';
+  document.querySelector('.lb-next').style.display = media.length > 1 ? 'flex' : 'none';
+
+  // Thumbnail filmstrip
+  if (media.length > 1) {
+    thumbs.style.display = 'flex';
+    thumbs.innerHTML = media.map((m, i) => {
+      const thumbSrc = m.type.startsWith('video') ? '' : escapeHtml(m.url);
+      return m.type.startsWith('video')
+        ? `<video class="lb-thumb${i===_lbIndex?' active':''}" src="${escapeHtml(m.url)}" data-idx="${i}" muted></video>`
+        : `<img class="lb-thumb${i===_lbIndex?' active':''}" src="${thumbSrc}" data-idx="${i}">`;
+    }).join('');
+  } else {
+    thumbs.style.display = 'none';
+    thumbs.innerHTML = '';
+  }
+}
+
+document.getElementById('lbThumbs').addEventListener('click', e => {
+  const thumb = e.target.closest('[data-idx]');
+  if (!thumb) return;
+  _lbIndex = Number(thumb.dataset.idx);
+  renderLightboxStage();
+});
+
+// Keyboard navigation for desktop users
+document.addEventListener('keydown', e => {
+  if (document.getElementById('lightbox').style.display !== 'flex') return;
+  if (e.key === 'Escape') closeLightbox();
+  else if (e.key === 'ArrowLeft') lightboxPrev();
+  else if (e.key === 'ArrowRight') lightboxNext();
+});
+
 /* ── TAG BADGE CLICK-TO-FILTER: clicking a post's category badge filters the feed ── */
 document.addEventListener('click', e => {
   const btn = e.target.closest('[data-action="filter-tag"][data-tag]');
@@ -908,15 +1040,41 @@ async function loadPosts() {
 function createPostCardElement(post, body, didTranslate) {
   const bm = bookmarks.includes(post.id);
 
-  const mediaHTML = (post.media || []).map(m => {
-    const mt = m.type || '';
-    const safeUrl = safeMediaUrl(m.url);
-    if (!safeUrl) return '';
-    if (mt === 'gif')           return `<div class="media-wrap"><img class="card-gif" src="${escapeHtml(safeUrl)}" alt="GIF" loading="lazy"></div>`;
-    if (mt.startsWith('image')) return `<div class="media-wrap"><img class="card-img" src="${escapeHtml(safeUrl)}" alt="" loading="lazy"></div>`;
-    if (mt.startsWith('video')) return `<div class="media-wrap"><video id="vid-${post.id}-${Math.random().toString(36).slice(2,7)}" class="card-video" src="${escapeHtml(safeUrl)}" controls preload="metadata" playsinline webkit-playsinline></video><div class="video-play-overlay">▶</div></div>`;
-    return '';
-  }).join('');
+  // Build a list of valid (safe-URL) media items; also register them so
+  // the lightbox can look them up later without re-parsing HTML
+  const validMedia = (post.media || [])
+    .map(m => ({ url: safeMediaUrl(m.url), type: m.type || '' }))
+    .filter(m => m.url);
+  _postMediaRegistry[post.id] = validMedia;
+
+  let mediaHTML = '';
+  if (validMedia.length === 1) {
+    // Single item — keep full-width native rendering (video keeps native controls)
+    const m = validMedia[0];
+    if (m.type === 'gif') {
+      mediaHTML = `<div class="media-wrap"><img class="card-gif" src="${escapeHtml(m.url)}" alt="GIF" loading="lazy" data-action="lightbox" data-pid="${post.id}" data-idx="0"></div>`;
+    } else if (m.type.startsWith('image')) {
+      mediaHTML = `<div class="media-wrap"><img class="card-img" src="${escapeHtml(m.url)}" alt="" loading="lazy" data-action="lightbox" data-pid="${post.id}" data-idx="0"></div>`;
+    } else if (m.type.startsWith('video')) {
+      mediaHTML = `<div class="media-wrap"><video id="vid-${post.id}-${Math.random().toString(36).slice(2,7)}" class="card-video" src="${escapeHtml(m.url)}" controls preload="metadata" playsinline webkit-playsinline></video><div class="video-play-overlay">▶</div></div>`;
+    }
+  } else if (validMedia.length > 1) {
+    // Multiple items — Telegram-style grid album, cap visible tiles at 6
+    const visible = validMedia.slice(0, 6);
+    const extra = validMedia.length - 6;
+    const tiles = visible.map((m, i) => {
+      const isLast = i === 5 && extra > 0;
+      const isVideo = m.type.startsWith('video');
+      const inner = isVideo
+        ? `<video src="${escapeHtml(m.url)}" muted playsinline preload="metadata"></video><div class="gi-play">▶</div>`
+        : `<img src="${escapeHtml(m.url)}" alt="" loading="lazy">`;
+      return `<div class="grid-item" data-action="lightbox" data-pid="${post.id}" data-idx="${i}">
+        ${inner}
+        ${isLast ? `<div class="gi-more">+${extra}</div>` : ''}
+      </div>`;
+    }).join('');
+    mediaHTML = `<div class="media-grid" data-count="${visible.length}">${tiles}</div>`;
+  }
 
   const rxns = post.reactions || {};
   const rxnHTML = buildReactionPillsHTML(post.id, rxns);
@@ -1065,6 +1223,7 @@ function buildFeedQuery({ before } = {}) {
 
 /* Track all currently-rendered posts (pinned + loaded pages) for offline cache + reaction lookups */
 let _renderedPosts = [];
+let _postMediaRegistry = {}; // postId -> [{url,type}, ...] for lightbox navigation
 function updateOfflineCache() {
   const cacheSafe = _renderedPosts.map(p => ({
     ...p,
