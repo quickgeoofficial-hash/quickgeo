@@ -232,7 +232,18 @@ footer span { font-size: 12px; color: var(--text3); }
 .rq-text { font-size: 12px; color: var(--text2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .edited-badge { font-size: 10px; color: var(--text3); font-weight: 400; font-family: 'DM Sans', sans-serif; margin-left: 4px; }
 
-/* Highlighted post when opened via shared link */
+.post-card { scroll-margin-top: 64px; }
+
+/* "New posts" pill — Twitter/X style, shown when new posts arrived while
+   the user was reading further down, tapping scrolls to top */
+.new-posts-banner {
+  position: fixed; top: 64px; left: 50%; transform: translateX(-50%);
+  background: var(--green); color: #fff; border: none; border-radius: 20px;
+  padding: 9px 18px; font-size: 13px; font-weight: 600; font-family: 'DM Sans', sans-serif;
+  cursor: pointer; z-index: 250; box-shadow: 0 4px 14px rgba(0,0,0,0.3);
+  animation: newPostsIn 0.3s ease;
+}
+@keyframes newPostsIn { from { transform: translate(-50%, -16px); opacity: 0; } to { transform: translateX(-50%); opacity: 1; } }
 .post-card.highlight-target { border-color: var(--green); box-shadow: 0 0 0 2px var(--green-light), var(--shadow); animation: highlightPulse 2s ease forwards; }
 @keyframes highlightPulse { 0%{border-color:var(--green)} 60%{border-color:var(--green)} 100%{border-color:var(--border)} }
 
@@ -1463,6 +1474,98 @@ if ('serviceWorker' in navigator) {
 }
 
 /* ════════════════════════════
+   RESUME READING POSITION
+   Tracks which post the user was reading (by ID, not raw scroll pixels —
+   pixel offsets break the moment a new post is published above them).
+   On return, scrolls back to that exact post. Also shows a "new posts"
+   pill if content arrived above their last-seen position, like Twitter/X.
+════════════════════════════ */
+const LAST_POST_KEY   = 'qg_last_post_id';
+const NEWEST_SEEN_KEY = 'qg_newest_seen_id';
+let _restoringPosition = false;
+
+let _saveScrollTimer = null;
+function trackReadingPosition() {
+  clearTimeout(_saveScrollTimer);
+  _saveScrollTimer = setTimeout(() => {
+    if (_restoringPosition) return; // don't save our own auto-scroll as the "reading position"
+    const headerH = 64;
+    const cards = document.querySelectorAll('.post-card[id^="post-"]');
+    for (const card of cards) {
+      const rect = card.getBoundingClientRect();
+      if (rect.bottom > headerH) {
+        localStorage.setItem(LAST_POST_KEY, card.id.replace('post-', ''));
+        break;
+      }
+    }
+    // Once scrolled back near the top, treat the newest loaded post as "seen"
+    if (window.scrollY < 100 && _renderedPosts.length) {
+      const newestId = Math.max(..._renderedPosts.map(p => p.id));
+      localStorage.setItem(NEWEST_SEEN_KEY, String(newestId));
+      hideNewPostsBanner();
+    }
+  }, 400);
+}
+window.addEventListener('scroll', trackReadingPosition, { passive: true });
+
+/* Attempt to scroll back to the saved post, loading extra pages if it's
+   further down than what's currently loaded. Capped to avoid loading the
+   entire feed if the saved post is very old / no longer exists. */
+async function restoreReadingPosition() {
+  const savedId = localStorage.getItem(LAST_POST_KEY);
+  if (!savedId) return;
+
+  _restoringPosition = true;
+  const maxAttempts = 15; // ~15 pages / up to ~300 posts before giving up quietly
+  let attempts = 0;
+
+  while (attempts < maxAttempts) {
+    const el = document.getElementById('post-' + savedId);
+    if (el) {
+      el.scrollIntoView({ behavior: 'instant', block: 'start' });
+      break;
+    }
+    if (!_hasMorePosts) break; // reached the end of the feed, post not found (deleted?)
+    await loadMorePosts();
+    attempts++;
+  }
+  _restoringPosition = false;
+}
+
+/* Compare the newest post currently in the feed against what was last
+   marked "seen" — show the pill if there's genuinely new content. */
+function checkForNewPosts() {
+  if (!_renderedPosts.length) return;
+  const newestId = Math.max(..._renderedPosts.map(p => p.id));
+  const seenId = Number(localStorage.getItem(NEWEST_SEEN_KEY)) || 0;
+  if (seenId && newestId > seenId) {
+    showNewPostsBanner();
+  } else {
+    localStorage.setItem(NEWEST_SEEN_KEY, String(newestId));
+  }
+}
+
+function showNewPostsBanner() {
+  if (document.getElementById('newPostsBanner')) return;
+  const banner = document.createElement('button');
+  banner.id = 'newPostsBanner';
+  banner.className = 'new-posts-banner';
+  banner.textContent = '🆕 New posts — tap to view';
+  banner.onclick = () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    hideNewPostsBanner();
+    if (_renderedPosts.length) {
+      const newestId = Math.max(..._renderedPosts.map(p => p.id));
+      localStorage.setItem(NEWEST_SEEN_KEY, String(newestId));
+    }
+  };
+  document.body.appendChild(banner);
+}
+function hideNewPostsBanner() {
+  document.getElementById('newPostsBanner')?.remove();
+}
+
+/* ════════════════════════════
    SCROLL TO SHARED POST
 ════════════════════════════ */
 function scrollToLinkedPost() {
@@ -1482,8 +1585,14 @@ function scrollToLinkedPost() {
 showSkeletons(3);
 
 // Initial load then connect SSE for real-time updates
-loadPosts().then(() => {
-  scrollToLinkedPost();
+loadPosts().then(async () => {
+  const hasShareLink = location.hash && location.hash.startsWith('#post-');
+  if (hasShareLink) {
+    scrollToLinkedPost(); // explicit shared link always wins over saved position
+  } else {
+    checkForNewPosts();          // show "new posts" pill if content arrived since last visit
+    await restoreReadingPosition(); // then jump back to where they left off
+  }
   connectSSE(); // posts now update in real-time via SSE
 });
 
