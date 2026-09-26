@@ -5,7 +5,7 @@
  */
 'use strict';
 require('dotenv').config();
-const express=require('express'),fs=require('fs'),path=require('path'),cors=require('cors'),crypto=require('crypto'),multer=require('multer'),compression=require('compression');
+const express=require('express'),fs=require('fs'),path=require('path'),cors=require('cors'),crypto=require('crypto'),multer=require('multer'),zlib=require('zlib');
 const { DatabaseSync } = require('node:sqlite'); // built into Node 22.5+ — no native compilation needed
 const app=express();
 const INSECURE=['Change_Me_Now@2025!','password','123456','admin','quickgeo_admin_2025',''];
@@ -160,7 +160,71 @@ app.use((req,res,next)=>{
   next();
 });
 
-app.use(compression()); // gzip all JSON/text responses — big bandwidth savings
+/* ── COMPRESSION: Zstd > Brotli > Gzip > none, negotiated per-request ──
+   Custom middleware instead of the `compression` npm package, since that
+   package has no Zstd support at all and doesn't give explicit priority
+   control. This inspects the client's Accept-Encoding header on every
+   request (the "handshake") and picks the best algorithm THIS client
+   actually advertises, in that fixed priority order. Falls back cleanly
+   to gzip or no compression on older clients/Node versions — nothing
+   breaks if Zstd isn't available either in the client or in this Node
+   build, it just silently skips to the next tier. */
+const HAS_ZSTD = typeof zlib.zstdCompressSync === 'function';
+const MIN_COMPRESS_SIZE = 512; // bytes — compressing tiny responses wastes more CPU than it saves in bytes
+
+function pickEncoding(acceptEncodingHeader) {
+  const advertised = new Set(
+    (acceptEncodingHeader || '').toLowerCase().split(',').map(s => s.trim().split(';')[0])
+  );
+  if (HAS_ZSTD && advertised.has('zstd')) return 'zstd';
+  if (advertised.has('br'))               return 'br';
+  if (advertised.has('gzip'))             return 'gzip';
+  return null; // client (or curl with no -H) advertised nothing we support — send plain
+}
+
+function compressionMiddleware(req, res, next) {
+  const originalSend = res.send.bind(res);
+
+  function compressAndSend(body, forceJsonType) {
+    const isBuffer = Buffer.isBuffer(body);
+    const buf = isBuffer ? body : Buffer.from(forceJsonType ? JSON.stringify(body) : String(body));
+    const encoding = pickEncoding(req.headers['accept-encoding']);
+
+    res.setHeader('Vary', 'Accept-Encoding'); // tells Cloudflare's edge cache to key by encoding too
+
+    if (forceJsonType) res.setHeader('Content-Type', 'application/json; charset=utf-8');
+
+    if (!encoding || buf.length < MIN_COMPRESS_SIZE) {
+      return res.end(buf);
+    }
+
+    let compressed;
+    try {
+      if (encoding === 'zstd')    compressed = zlib.zstdCompressSync(buf);
+      else if (encoding === 'br') compressed = zlib.brotliCompressSync(buf, {
+        params: { [zlib.constants.BROTLI_PARAM_QUALITY]: 5 } // balanced for a phone CPU — quality 11 is too slow for live requests
+      });
+      else                        compressed = zlib.gzipSync(buf);
+    } catch (e) {
+      console.warn(`[COMPRESS] ${encoding} failed, sending uncompressed:`, e.message);
+      return res.end(buf);
+    }
+
+    res.setHeader('Content-Encoding', encoding);
+    res.end(compressed);
+  }
+
+  res.json = (body) => compressAndSend(body, true);
+  // Only intercept string/plain-object bodies — Buffers (e.g. any future
+  // binary send()) pass straight through untouched, never double-compressed
+  res.send = (body) => {
+    if (Buffer.isBuffer(body) || typeof body === 'undefined') return originalSend(body);
+    return compressAndSend(body, typeof body === 'object');
+  };
+
+  next();
+}
+app.use(compressionMiddleware);
 app.use(cors({origin(origin,cb){if(!origin)return cb(null,true);if(config.allowedOrigins.includes(origin))return cb(null,true);cb(new Error(`CORS blocked: ${origin}`));},credentials:true}));
 app.use(express.json({limit:`${config.maxBodyMB}mb`}));
 app.use((req,_,next)=>{console.log(`[${new Date().toLocaleTimeString()}] ${req.method} ${req.path}`);next();});
@@ -178,7 +242,7 @@ app.use('/uploads',(req,res)=>{
   else{res.writeHead(200,{'Content-Length':size,'Content-Type':type,'Accept-Ranges':'bytes','Cache-Control':'public, max-age=86400'});fs.createReadStream(fp).pipe(res);}
 });
 function adminOnly(req,res,next){const auth=req.headers['authorization']||'',tok=auth.startsWith('Bearer ')?auth.slice(7):'';if(!isValidSession(tok))return res.status(401).json({error:'Session expired. Please log in again.'});next();}
-app.get('/health',(req,res)=>res.json({status:'ok',server:'Quickgeo',version:'3.3.1',time:new Date().toISOString(),posts:db.prepare('SELECT COUNT(*) as n FROM posts').get().n,clients:sseClients.size}));
+app.get('/health',(req,res)=>res.json({status:'ok',server:'Quickgeo',version:'3.4.0',time:new Date().toISOString(),posts:db.prepare('SELECT COUNT(*) as n FROM posts').get().n,clients:sseClients.size,compression:{zstd:HAS_ZSTD,brotli:true,gzip:true}}));
 app.get('/api/stream',(req,res)=>{res.setHeader('Content-Type','text/event-stream');res.setHeader('Cache-Control','no-cache');res.setHeader('Connection','keep-alive');res.setHeader('X-Accel-Buffering','no');res.flushHeaders();res.write('data: {"type":"connected"}\n\n');sseClients.add(res);const hb=setInterval(()=>{try{res.write(': ping\n\n');}catch{}},25000);req.on('close',()=>{clearInterval(hb);sseClients.delete(res);});});
 app.post('/api/upload',adminOnly,rateLimit('upload',30,10*60000),upload.single('file'),(req,res)=>{
   if(!req.file)return res.status(400).json({error:'No file received'});
@@ -285,13 +349,14 @@ app.post('/api/categories',adminOnly,(req,res)=>{
 app.delete('/api/categories/:name',adminOnly,(req,res)=>{const r=db.prepare('DELETE FROM categories WHERE name=?').run(decodeURIComponent(req.params.name));if(r.changes===0)return res.status(404).json({error:'Category not found'});res.json({ok:true});});
 app.listen(config.port,'0.0.0.0',()=>{
   console.log('\n╔══════════════════════════════════╗');
-  console.log('║   Quickgeo Server v3.3 Running   ║');
+  console.log('║   Quickgeo Server v3.4 Running   ║');
   console.log('╚══════════════════════════════════╝');
-  console.log(`\n✅  Port     → ${config.port}`);
-  console.log(`👤  Username → ${config.adminUsername}`);
-  console.log(`🔒  Password → *** (from .env)`);
-  console.log(`🗄️   Database → ${path.join(DATA_DIR,'quickgeo.db')}`);
-  console.log(`📁  Uploads  → ${UPLOADS_DIR}`);
-  console.log(`🌐  Origins  → ${config.allowedOrigins.join(', ')}`);
-  console.log(`🛡️   Hardening → rate-limit + gzip + security headers + indexes\n`);
+  console.log(`\n✅  Port       → ${config.port}`);
+  console.log(`👤  Username   → ${config.adminUsername}`);
+  console.log(`🔒  Password   → *** (from .env)`);
+  console.log(`🗄️   Database   → ${path.join(DATA_DIR,'quickgeo.db')}`);
+  console.log(`📁  Uploads    → ${UPLOADS_DIR}`);
+  console.log(`🌐  Origins    → ${config.allowedOrigins.join(', ')}`);
+  console.log(`🗜️   Compression → Zstd ${HAS_ZSTD ? '✅' : '❌ (Node too old, using Brotli/Gzip)'} · Brotli ✅ · Gzip ✅`);
+  console.log(`🛡️   Hardening  → rate-limit + security headers + indexes\n`);
 });
