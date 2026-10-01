@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Quickgeo — Sign In</title>
 <meta name="robots" content="noindex, nofollow">
 <link rel="icon" type="image/png" href="submark.png">
@@ -27,7 +27,10 @@ body {
   font-family: 'DM Sans', sans-serif;
   background: var(--bg); color: var(--text);
   min-height: 100vh; display: flex; align-items: center; justify-content: center;
-  padding: 20px; transition: background 0.25s, color 0.25s;
+  padding: 20px;
+  padding-left: calc(20px + env(safe-area-inset-left, 0px));
+  padding-right: calc(20px + env(safe-area-inset-right, 0px));
+  transition: background 0.25s, color 0.25s;
 }
 .card {
   background: var(--surface); border-radius: 20px; border: 1px solid var(--border);
@@ -76,7 +79,7 @@ input:focus { border-color: var(--green); }
 <div class="card">
   <div class="logo"><img src="submark.png" alt="Quickgeo" class="logo-img"><span class="logo-text">Quickgeo</span></div>
   <h1>Admin Sign In</h1>
-  <p class="sub">Enter your credentials to access the admin panel.</p>
+  <p class="sub">admin only.</p>
 
   <div class="server-info">
     <div class="server-dot" id="serverDot"></div>
@@ -157,7 +160,7 @@ async function checkServer() {
     } else throw new Error('bad response');
   } catch {
     dot.className = 'server-dot err';
-    info.textContent = 'Cannot reach server — is Termux running?';
+    info.textContent = 'Cannot reach server';
   }
 }
 
