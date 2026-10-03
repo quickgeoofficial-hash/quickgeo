@@ -21,13 +21,18 @@
 <meta name="twitter:description" content="Fast geopolitics updates without the noise — wars, diplomacy, elections and world affairs.">
 <meta name="twitter:image"      content="https://quickgeo.live/logo.png">
 <link rel="canonical"           href="https://quickgeo.live">
-<link rel="icon" type="image/png" href="submark.png">
-<link rel="apple-touch-icon" href="submark.png">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
 <link rel="manifest" href="manifest.json">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Quickgeo">
+<link rel="preconnect" href="https://api.quickgeo.live" crossorigin>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="dns-prefetch" href="https://www.highrevenueformat.com">
+<link rel="dns-prefetch" href="https://pl31586565.profitableratecpmnetwork.com">
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
 <!-- Ad network: Adsterra (see adsterraSlots further down for implementation) -->
 <style>
@@ -308,7 +313,7 @@ footer span { font-size: 12px; color: var(--text3); }
 
 <div class="overlay" id="installOverlay" style="display:none" role="dialog" aria-modal="true" aria-label="Add to home screen">
   <div class="install-box">
-    <div class="ib-icon"><img src="submark.png" alt="Quickgeo" style="width:64px;height:64px;object-fit:contain;border-radius:14px;"></div>
+    <div class="ib-icon"><img src="submark-sm.png" alt="Quickgeo" style="width:64px;height:64px;object-fit:contain;border-radius:14px;"></div>
     <div class="ib-title">Add Quickgeo to your screen</div>
     <p class="ib-desc">Get instant access from your home screen — no app store needed!</p>
     <div class="ib-steps" id="installSteps"></div>
@@ -321,7 +326,7 @@ footer span { font-size: 12px; color: var(--text3); }
 <header class="topbar">
   <button class="icon-btn" id="menuBtn" onclick="openSideMenu()" aria-label="Open menu" style="margin-right:2px">☰</button>
   <a class="logo" href="#" aria-label="Quickgeo home">
-    <div class="logo-dot"></div><img src="submark.png" alt="Quickgeo" class="logo-img"> Quickgeo
+    <div class="logo-dot"></div><img src="submark-sm.png" alt="Quickgeo" class="logo-img"> Quickgeo
     <span class="live-badge" aria-label="Live">● LIVE</span>
   </a>
   <nav class="topbar-right" aria-label="Site controls">
@@ -354,7 +359,7 @@ footer span { font-size: 12px; color: var(--text3); }
 <div class="side-menu-overlay" id="sideMenuOverlay" onclick="closeSideMenu()"></div>
 <nav class="side-menu" id="sideMenu" aria-label="Site menu" aria-hidden="true">
   <div class="sm-header">
-    <div class="sm-logo"><img src="submark.png" alt="Quickgeo" class="logo-img"> Quickgeo</div>
+    <div class="sm-logo"><img src="submark-sm.png" alt="Quickgeo" class="logo-img"> Quickgeo</div>
     <button class="icon-btn" onclick="closeSideMenu()" aria-label="Close menu">✕</button>
   </div>
   <div class="sm-links">
@@ -578,13 +583,18 @@ if (lang !== 'en') {
 /* ════════════════════════════
    TRANSLATE API
 ════════════════════════════ */
+const _trCache = new Map(); // "lang|text" -> translated text (avoids re-requesting on every feed reload)
 async function translateText(text, targetLang) {
   if (!text || targetLang === 'en') return text;
+  const ck = targetLang + '|' + text;
+  if (_trCache.has(ck)) return _trCache.get(ck);
   try {
     const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=${targetLang}&dt=t&q=${encodeURIComponent(text)}`;
     const r = await fetch(url);
     const d = await r.json();
-    return d[0].map(s => s[0]).join('');
+    const out = d[0].map(s => s[0]).join('');
+    _trCache.set(ck, out);
+    return out;
   } catch { return text; }
 }
 
@@ -1053,9 +1063,9 @@ function createPostCardElement(post, body, didTranslate) {
     // Single item — keep full-width native rendering (video keeps native controls)
     const m = validMedia[0];
     if (m.type === 'gif') {
-      mediaHTML = `<div class="media-wrap"><img class="card-gif" src="${escapeHtml(m.url)}" alt="GIF" loading="lazy" data-action="lightbox" data-pid="${post.id}" data-idx="0"></div>`;
+      mediaHTML = `<div class="media-wrap"><img class="card-gif" src="${escapeHtml(m.url)}" alt="GIF" loading="lazy" decoding="async" data-action="lightbox" data-pid="${post.id}" data-idx="0"></div>`;
     } else if (m.type.startsWith('image')) {
-      mediaHTML = `<div class="media-wrap"><img class="card-img" src="${escapeHtml(m.url)}" alt="" loading="lazy" data-action="lightbox" data-pid="${post.id}" data-idx="0"></div>`;
+      mediaHTML = `<div class="media-wrap"><img class="card-img" src="${escapeHtml(m.url)}" alt="" loading="lazy" decoding="async" data-action="lightbox" data-pid="${post.id}" data-idx="0"></div>`;
     } else if (m.type.startsWith('video')) {
       mediaHTML = `<div class="media-wrap"><video id="vid-${post.id}-${Math.random().toString(36).slice(2,7)}" class="card-video" src="${escapeHtml(m.url)}" controls preload="metadata" playsinline webkit-playsinline></video><div class="video-play-overlay">▶</div></div>`;
     }
@@ -1068,7 +1078,7 @@ function createPostCardElement(post, body, didTranslate) {
       const isVideo = m.type.startsWith('video');
       const inner = isVideo
         ? `<video src="${escapeHtml(m.url)}" muted playsinline preload="metadata"></video><div class="gi-play">▶</div>`
-        : `<img src="${escapeHtml(m.url)}" alt="" loading="lazy">`;
+        : `<img src="${escapeHtml(m.url)}" alt="" loading="lazy" decoding="async">`;
       return `<div class="grid-item" data-action="lightbox" data-pid="${post.id}" data-idx="${i}">
         ${inner}
         ${isLast ? `<div class="gi-more">+${extra}</div>` : ''}
@@ -1101,7 +1111,7 @@ function createPostCardElement(post, body, didTranslate) {
   card.innerHTML = `
     ${post.pinned ? `<div class="pin-lbl">📌 ${t('pinned')}</div>` : ''}
     <div class="card-head">
-      <div class="ch-avatar" aria-hidden="true"><img src="submark.png" alt="Quickgeo"></div>
+      <div class="ch-avatar" aria-hidden="true"><img src="submark-sm.png" alt="Quickgeo"></div>
       <div class="ch-meta">
         <div class="ch-name">Quickgeo ${editedBadge}</div>
         <div class="ch-time"><time>${escapeHtml(post.date)}</time> · ${escapeHtml(post.time)}</div>
@@ -1185,9 +1195,9 @@ const ADSTERRA_KEYS = {
 
 let _nativeAdUsed = false;
 
-/* Append an in-feed ad card at the current render index if due (every 3rd post) */
+/* Append an in-feed ad card at the current render index if due (every 4th post) */
 function maybeInsertAd(feed) {
-  if (_feedRenderIndex > 0 && _feedRenderIndex % 3 === 0) {
+  if (_feedRenderIndex > 0 && _feedRenderIndex % 4 === 0) {
     const adCard = document.createElement('div');
     adCard.className = 'infeed-ad';
     adCard.setAttribute('aria-label', 'Advertisement');
@@ -1298,7 +1308,7 @@ function buildFeedQuery({ before } = {}) {
 let _renderedPosts = [];
 let _postMediaRegistry = {}; // postId -> [{url,type}, ...] for lightbox navigation
 function updateOfflineCache() {
-  const cacheSafe = _renderedPosts.map(p => ({
+  const cacheSafe = _renderedPosts.slice(0, 40).map(p => ({
     ...p,
     media: (p.media || []).map(m => ({
       ...m,
@@ -1578,7 +1588,7 @@ async function restoreReadingPosition() {
   if (!savedId) return;
 
   _restoringPosition = true;
-  const maxAttempts = 15; // ~15 pages / up to ~300 posts before giving up quietly
+  const maxAttempts = 5; // ~5 pages / ~100 posts max — each page adds ad iframes, so keep this small
   let attempts = 0;
 
   while (attempts < maxAttempts) {
@@ -1658,7 +1668,8 @@ function populateAdsterraSlots() {
   ];
   slots.forEach(slot => {
     const el = document.getElementById(slot.id);
-    if (!el) return; // sidebar slots don't exist on mobile (hidden via CSS/not rendered) — safe to skip
+    if (!el) return;
+    if (!el.offsetParent) return; // slot is hidden by CSS (wrong breakpoint / sidebar on mobile) — don't load an ad nobody can see
     el.appendChild(createAdsterraBannerIframe(slot.key, slot.w, slot.h));
   });
 }
