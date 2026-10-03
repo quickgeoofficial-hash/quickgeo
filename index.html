@@ -29,8 +29,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Quickgeo">
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
-<!-- Google AdSense -->
-<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7714449427310539" crossorigin="anonymous"></script>
+<!-- Ad network: Adsterra (see adsterraSlots further down for implementation) -->
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -93,6 +92,15 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .ad-placeholder ins { display: block; width: 100%; }
 /* "Advertisement" label — required by AdSense policy */
 .ad-label { font-size: 9px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.07em; padding: 4px 0 0; }
+
+.top-banner-wrap { display: flex; flex-direction: column; align-items: center; margin-bottom: 14px; padding: 8px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.top-banner-slot { max-width: 100%; }
+.desktop-only { display: block; }
+.mobile-only { display: none; }
+@media (max-width: 767px) {
+  .desktop-only { display: none; }
+  .mobile-only { display: block; }
+}
 
 /* ── SCROLLABLE FEED CENTER ── */
 .feed-col { flex: 1; overflow-y: auto; overflow-x: hidden; min-width: 0; }
@@ -360,31 +368,22 @@ footer span { font-size: 12px; color: var(--text3); }
 <!-- Page body: fixed ad cols + scrolling feed -->
 <div class="page-body">
 
-  <!-- LEFT AD -->
+  <!-- LEFT AD — populated by JS (adsterraSlots) with sandboxed iframes -->
   <aside class="ad-col left" aria-label="Advertisement">
-    <div class="ad-slot">
-      <div class="ad-placeholder">
-        <!-- Google AdSense: replace this div with your <ins class="adsbygoogle"> tag -->
-        <!-- Example:
-        <ins class="adsbygoogle"
-          style="display:block;width:120px;height:240px"
-          data-ad-client="ca-pub-7714449427310539"
-          data-ad-slot="XXXXXXXXXX"></ins>
-        <script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
-        -->
-        <div class="ad-label">Advertisement</div>
-      </div>
-    </div>
-    <div class="ad-slot">
-      <div class="ad-placeholder">
-        <div class="ad-label">Advertisement</div>
-      </div>
-    </div>
+    <div class="ad-slot"><div class="ad-placeholder" id="adLeftTop"><div class="ad-label">Advertisement</div></div></div>
+    <div class="ad-slot"><div class="ad-placeholder" id="adLeftBottom"><div class="ad-label">Advertisement</div></div></div>
   </aside>
 
   <!-- SCROLLABLE FEED -->
   <main class="feed-col" id="feedCol">
     <div class="feed-inner">
+      <!-- Top banner — 728x90 on desktop, 468x60 on mobile (populated by JS) -->
+      <div class="top-banner-wrap">
+        <div class="ad-label">Advertisement</div>
+        <div id="adTopDesktop" class="top-banner-slot desktop-only"></div>
+        <div id="adTopMobile" class="top-banner-slot mobile-only"></div>
+      </div>
+
       <div class="feed-hdr">
         <div>
           <h2 id="lblLatest">Latest Updates</h2>
@@ -405,19 +404,10 @@ footer span { font-size: 12px; color: var(--text3); }
     </div>
   </main>
 
-  <!-- RIGHT AD -->
+  <!-- RIGHT AD — populated by JS (adsterraSlots) with sandboxed iframes -->
   <aside class="ad-col right" aria-label="Advertisement">
-    <div class="ad-slot">
-      <div class="ad-placeholder">
-        <!-- Google AdSense: replace with your <ins class="adsbygoogle"> tag -->
-        <div class="ad-label">Advertisement</div>
-      </div>
-    </div>
-    <div class="ad-slot">
-      <div class="ad-placeholder">
-        <div class="ad-label">Advertisement</div>
-      </div>
-    </div>
+    <div class="ad-slot"><div class="ad-placeholder" id="adRightTop"><div class="ad-label">Advertisement</div></div></div>
+    <div class="ad-slot"><div class="ad-placeholder" id="adRightBottom"><div class="ad-label">Advertisement</div></div></div>
   </aside>
 
 </div>
@@ -1134,24 +1124,95 @@ function createPostCardElement(post, body, didTranslate) {
   return card;
 }
 
+/* ── ADSTERRA AD SYSTEM ──
+   Two ad formats in use, by design (Social Bar deliberately excluded —
+   see the conversation this was built from: that format specifically
+   mimics OS/browser notifications and fake close buttons, which is the
+   deceptive pattern behind most "fake virus warning" complaints against
+   ad networks like this one):
+
+   1. BANNER (sandboxed iframe) — used in sidebar, top-of-feed, and every
+      repeat in-feed slot. Each instance gets its own isolated iframe via
+      srcdoc, which solves two real problems at once:
+        a) Adsterra's banner script relies on a single shared global
+           variable (atOptions) set right before each invoke.js loads —
+           placing multiple different ad units directly on one page would
+           make them overwrite each other. Isolating each in its own
+           iframe gives each one its own clean global scope.
+        b) The sandbox attribute explicitly omits allow-popups and
+           allow-top-navigation, so even if an ad script attempts a
+           forced popup/redirect, the browser blocks it at a technical
+           level — regardless of what the ad network's script tries to do.
+
+   2. NATIVE BANNER — used ONCE, for the first in-feed ad slot only.
+      Adsterra's native format targets a single hardcoded container ID,
+      so it's a once-per-page format by design, not something that can
+      safely repeat on every 3rd post with infinite scroll. Deliberately
+      NOT sandboxed, since native ads need to inherit page fonts/colors
+      to blend in as a content card — that's the entire point of the
+      format. Always clearly labeled "Advertisement" regardless. */
+
+function createAdsterraBannerIframe(key, width, height) {
+  const iframe = document.createElement('iframe');
+  iframe.width = width;
+  iframe.height = height;
+  iframe.style.cssText = 'border:0; max-width:100%; display:block;';
+  iframe.setAttribute('scrolling', 'no');
+  iframe.setAttribute('title', 'Advertisement');
+  iframe.setAttribute('loading', 'lazy');
+  // allow-scripts: required for the ad to render at all.
+  // allow-same-origin: many ad scripts need this to function (cookies, etc).
+  // Deliberately omitted: allow-popups, allow-popups-to-escape-sandbox,
+  // allow-top-navigation(-by-user-activation), allow-forms — this blocks
+  // popup/redirect behavior at the browser level.
+  iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin');
+  iframe.srcdoc = `<!DOCTYPE html><html><head><style>html,body{margin:0;padding:0;overflow:hidden;background:transparent;}</style></head><body>
+<script>atOptions={'key':'${key}','format':'iframe','height':${height},'width':${width},'params':{}};<\/script>
+<script src="https://www.highrevenueformat.com/${key}/invoke.js"><\/script>
+</body></html>`;
+  return iframe;
+}
+
+/* Banner ad unit keys — from the Adsterra dashboard */
+const ADSTERRA_KEYS = {
+  w468h60:  'c03adb4fca6ea5a17d1a9cc7222b3a59',
+  w160h300: '4073c590bce68cd1743efd60fa60efe8',
+  w728h90:  '7c199d361dd6b869209f4f0b7d99767d',
+  w160h600: 'a1c408ea8d429eab444995c39ef3f3de',
+  w300h250: 'a8a37d1a127a09825a3d59a0bffabb96',
+};
+
+let _nativeAdUsed = false;
+
 /* Append an in-feed ad card at the current render index if due (every 3rd post) */
 function maybeInsertAd(feed) {
   if (_feedRenderIndex > 0 && _feedRenderIndex % 3 === 0) {
     const adCard = document.createElement('div');
     adCard.className = 'infeed-ad';
     adCard.setAttribute('aria-label', 'Advertisement');
-    adCard.innerHTML = `
-      <div class="infeed-ad-label">📢 Advertisement</div>
-      <!-- REPLACE THIS COMMENT WITH YOUR ADSENSE IN-FEED AD CODE:
-      <ins class="adsbygoogle"
-        style="display:block"
-        data-ad-format="fluid"
-        data-ad-layout-key="-fb+5w+4e-db+86"
-        data-ad-client="ca-pub-7714449427310539"
-        data-ad-slot="XXXXXXXXXX"></ins>
-      <script>(adsbygoogle = window.adsbygoogle || []).push({});<\/script>
-      -->`;
-    feed.appendChild(adCard);
+
+    if (!_nativeAdUsed) {
+      // First in-feed slot gets the Native Banner (once per page load)
+      _nativeAdUsed = true;
+      adCard.innerHTML = `<div class="infeed-ad-label">📢 Advertisement</div><div id="container-660e63d3f5dd85b4f8b60722a0c34b12"></div>`;
+      feed.appendChild(adCard);
+      const s = document.createElement('script');
+      s.async = true;
+      s.setAttribute('data-cfasync', 'false');
+      s.src = 'https://pl31586565.profitableratecpmnetwork.com/660e63d3f5dd85b4f8b60722a0c34b12/invoke.js';
+      document.body.appendChild(s);
+    } else {
+      // Every subsequent in-feed slot: sandboxed 300x250 Banner (safe to repeat)
+      const labelDiv = document.createElement('div');
+      labelDiv.className = 'infeed-ad-label';
+      labelDiv.textContent = '📢 Advertisement';
+      adCard.appendChild(labelDiv);
+      adCard.style.display = 'flex';
+      adCard.style.flexDirection = 'column';
+      adCard.style.alignItems = 'center';
+      adCard.appendChild(createAdsterraBannerIframe(ADSTERRA_KEYS.w300h250, 300, 250));
+      feed.appendChild(adCard);
+    }
   }
 }
 
@@ -1583,6 +1644,24 @@ function scrollToLinkedPost() {
 ════════════════════════════ */
 // Show skeleton cards immediately while posts load
 showSkeletons(3);
+
+/* ── Populate static Banner ad slots (sidebar + top) — each isolated in its own sandboxed iframe ── */
+function populateAdsterraSlots() {
+  const slots = [
+    { id: 'adLeftTop',     key: ADSTERRA_KEYS.w160h600, w: 160, h: 600 },
+    { id: 'adLeftBottom',  key: ADSTERRA_KEYS.w160h300, w: 160, h: 300 },
+    { id: 'adRightTop',    key: ADSTERRA_KEYS.w160h600, w: 160, h: 600 },
+    { id: 'adRightBottom', key: ADSTERRA_KEYS.w160h300, w: 160, h: 300 },
+    { id: 'adTopDesktop',  key: ADSTERRA_KEYS.w728h90,  w: 728, h: 90  },
+    { id: 'adTopMobile',   key: ADSTERRA_KEYS.w468h60,  w: 468, h: 60  },
+  ];
+  slots.forEach(slot => {
+    const el = document.getElementById(slot.id);
+    if (!el) return; // sidebar slots don't exist on mobile (hidden via CSS/not rendered) — safe to skip
+    el.appendChild(createAdsterraBannerIframe(slot.key, slot.w, slot.h));
+  });
+}
+populateAdsterraSlots();
 
 // Initial load then connect SSE for real-time updates
 loadPosts().then(async () => {
