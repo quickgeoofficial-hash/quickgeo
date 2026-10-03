@@ -1,44 +1,56 @@
-const CACHE = 'qg-user-v2';
+const CACHE = 'qg-user-v3';
 const CORE = ['./index.html', './manifest.json'];
 
-self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(CORE)).then(() => self.skipWaiting()));
+self.addEventListener('install', event => {
+  event.waitUntil(
+    caches.open(CACHE)
+      .then(cache => cache.addAll(CORE))
+      .then(() => self.skipWaiting())
+  );
 });
 
-self.addEventListener('activate', e => {
-  e.waitUntil(
+self.addEventListener('activate', event => {
+  event.waitUntil(
     caches.keys()
-      .then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
+      .then(keys =>
+        Promise.all(
+          keys
+            .filter(key => key !== CACHE)
+            .map(key => caches.delete(key))
+        )
+      )
       .then(() => self.clients.claim())
   );
 });
 
-self.addEventListener('fetch', e => {
-  const url = e.request.url;
+self.addEventListener('fetch', event => {
+  const request = event.request;
 
-  
-  if (e.request.method !== 'GET') return;
+ 
+  if (request.method !== 'GET') return;
 
-  
-  if (
-    url.includes('api.quickgeo.live') ||
-    url.includes('googlesyndication') ||
-    url.includes('doubleclick') ||
-    url.includes('translate.googleapis') ||
-    url.includes('giphy.com')
-  ) return;
 
-  
-  e.respondWith(
-    fetch(e.request)
-      .then(res => {
-        
-        if (res.ok && res.status === 200) {
-          const clone = res.clone();
-          caches.open(CACHE).then(c => c.put(e.request, clone));
+  const requestURL = new URL(request.url);
+
+  if (requestURL.origin !== self.location.origin) {
+    return;
+  }
+
+  event.respondWith(
+    fetch(request)
+      .then(response => {
+        if (response.ok && response.status === 200) {
+          const clone = response.clone();
+
+          caches.open(CACHE)
+            .then(cache => cache.put(request, clone))
+            .catch(() => {});
         }
-        return res;
+
+        return response;
       })
-      .catch(() => caches.match(e.request))
+      .catch(() => {
+        return caches.match(request);
+      })
   );
 });
