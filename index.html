@@ -1161,11 +1161,11 @@ function createAdsterraBannerIframe(key, width, height) {
   iframe.setAttribute('title', 'Advertisement');
   iframe.setAttribute('loading', 'lazy');
   // allow-scripts: required for the ad to render at all.
-  // allow-same-origin: many ad scripts need this to function (cookies, etc).
+  // allow-same-origin intentionally omitted: with srcdoc it would share this page's origin and let the ad script remove its own sandbox.
   // Deliberately omitted: allow-popups, allow-popups-to-escape-sandbox,
   // allow-top-navigation(-by-user-activation), allow-forms — this blocks
   // popup/redirect behavior at the browser level.
-  iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin');
+  iframe.setAttribute('sandbox', 'allow-scripts');
   iframe.srcdoc = `<!DOCTYPE html><html><head><style>html,body{margin:0;padding:0;overflow:hidden;background:transparent;}</style></head><body>
 <script>atOptions={'key':'${key}','format':'iframe','height':${height},'width':${width},'params':{}};<\/script>
 <script src="https://www.highrevenueformat.com/${key}/invoke.js"><\/script>
