@@ -1197,12 +1197,13 @@ let _nativeAdUsed = false;
 
 /* Append an in-feed ad card at the current render index if due (every 4th post) */
 function maybeInsertAd(feed) {
-  if (_feedRenderIndex > 0 && _feedRenderIndex % 4 === 0) {
+  // Slot 0 = always one ad at the very top of the feed (before the first post), then every 4th post
+  if (_feedRenderIndex === 0 || _feedRenderIndex % 4 === 0) {
     const adCard = document.createElement('div');
     adCard.className = 'infeed-ad';
     adCard.setAttribute('aria-label', 'Advertisement');
 
-    if (!_nativeAdUsed) {
+    if (!_nativeAdUsed && _feedRenderIndex > 0) {
       // First in-feed slot gets the Native Banner (once per page load)
       _nativeAdUsed = true;
       adCard.innerHTML = `<div class="infeed-ad-label">📢 Advertisement</div><div id="container-660e63d3f5dd85b4f8b60722a0c34b12"></div>`;
