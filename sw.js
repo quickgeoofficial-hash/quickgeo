@@ -1,4 +1,4 @@
-const CACHE = 'qg-user-v2';
+const CACHE = 'qg-user-v3';
 const CORE = ['./index.html', './manifest.json'];
 
 self.addEventListener('install', e => {
@@ -18,6 +18,10 @@ self.addEventListener('fetch', e => {
 
   // NEVER intercept non-GET requests (POST/DELETE/PATCH) — Cache API only supports GET
   if (e.request.method !== 'GET') return;
+
+  // Only handle same-origin requests. Cross-origin scripts (ads, analytics beacon)
+  // must go straight to the network, otherwise the SW's fetch() is subject to connect-src.
+  if (new URL(e.request.url).origin !== self.location.origin) return;
 
   // Never intercept API calls, ads, translate, giphy, or uploads
   if (
@@ -39,6 +43,6 @@ self.addEventListener('fetch', e => {
         }
         return res;
       })
-      .catch(() => caches.match(e.request))
+      .catch(() => caches.match(e.request).then(r => r || Response.error()))
   );
 });
