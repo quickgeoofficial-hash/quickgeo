@@ -91,7 +91,38 @@ function verifyMagicBytes(filePath,claimedMime){
   }catch{ if(fd!==undefined)try{fs.closeSync(fd);}catch{} return false; }
 }
 const sseClients=new Set();
-function broadcast(data){const msg=`data: ${JSON.stringify(data)}\n\n`;for(const r of sseClients){try{r.write(msg);}catch{sseClients.delete(r);}}}
+function broadcast(data){indexNowQueue(data);const msg=`data: ${JSON.stringify(data)}\n\n`;for(const r of sseClients){try{r.write(msg);}catch{sseClients.delete(r);}}}
+
+/* ── IndexNow: tells Bing (and engines/AI search that use its index) about new, edited and deleted posts
+   within seconds instead of waiting for a crawl. The key is public by design — it is verified by
+   fetching https://quickgeo.live/<key>.txt. Set INDEXNOW_ENABLED=false in .env to turn it off. ── */
+const INDEXNOW_KEY=process.env.INDEXNOW_KEY||'6a6c6b387104a44fc61c2d873de7a481';
+const INDEXNOW_SITE='https://quickgeo.live';
+const indexNowPending=new Set();let indexNowQuiet=null,indexNowMax=null;
+function indexNowQueue(d){
+  if(process.env.INDEXNOW_ENABLED==='false'||!d||!d.id)return;
+  if(!['new_post','update_post','delete_post'].includes(d.type))return;
+  indexNowPending.add(`${INDEXNOW_SITE}/post/${d.id}`);
+  if(d.type==='new_post')indexNowPending.add(`${INDEXNOW_SITE}/`);
+  // Bulk publishing: wait until you pause for 30s, then send everything in one request.
+  // Never wait longer than 2 minutes in total, so a long session still gets sent.
+  clearTimeout(indexNowQuiet);indexNowQuiet=setTimeout(indexNowFlush,30000);
+  if(!indexNowMax)indexNowMax=setTimeout(indexNowFlush,120000);
+}
+async function indexNowFlush(){
+  clearTimeout(indexNowQuiet);clearTimeout(indexNowMax);indexNowQuiet=indexNowMax=null;
+  const all=[...indexNowPending];indexNowPending.clear();
+  for(let i=0;i<all.length;i+=1000){ // IndexNow allows up to 10,000 per request; 1000 keeps requests small
+    const urlList=all.slice(i,i+1000);
+    try{
+      const r=await fetch('https://api.indexnow.org/indexnow',{method:'POST',
+        headers:{'Content-Type':'application/json; charset=utf-8'},
+        body:JSON.stringify({host:'quickgeo.live',key:INDEXNOW_KEY,keyLocation:`${INDEXNOW_SITE}/${INDEXNOW_KEY}.txt`,urlList}),
+        signal:AbortSignal.timeout(10000)});
+      console.log('[IndexNow]',r.status,urlList.length,'url(s)');
+    }catch(e){console.warn('[IndexNow] failed:',e.message);}
+  }
+}
 
 /* ── RATE LIMITING (pure JS, no dependency, in-memory) ── */
 const rateBuckets=new Map(); // key: `${ip}:${route}` -> {count, resetAt}
