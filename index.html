@@ -34,6 +34,43 @@
 <link rel="dns-prefetch" href="https://www.highrevenueformat.com">
 <link rel="dns-prefetch" href="https://pl31586565.profitableratecpmnetwork.com">
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "NewsMediaOrganization",
+      "@id": "https://quickgeo.live/#organization",
+      "name": "Quickgeo",
+      "url": "https://quickgeo.live/",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://quickgeo.live/icon-512.png",
+        "width": 512,
+        "height": 512
+      },
+      "description": "Live geopolitics news: wars and conflicts, international relations, diplomacy, elections, sanctions and strategic developments, updated in real time.",
+      "contactPoint": {
+        "@type": "ContactPoint",
+        "contactType": "editorial",
+        "url": "https://quickgeo.live/contact.html"
+      },
+      "publishingPrinciples": "https://quickgeo.live/about.html"
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://quickgeo.live/#website",
+      "url": "https://quickgeo.live/",
+      "name": "Quickgeo",
+      "description": "Live geopolitics and world affairs news feed.",
+      "inLanguage": "en",
+      "publisher": {
+        "@id": "https://quickgeo.live/#organization"
+      }
+    }
+  ]
+}
+</script>
 <!-- Ad network: Adsterra (see adsterraSlots further down for implementation) -->
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -115,7 +152,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 
 /* Feed header row */
 .feed-hdr { display: flex; align-items: center; justify-content: space-between; }
-.feed-hdr h2 { font-family: 'Syne', sans-serif; font-size: 11px; font-weight: 600; color: var(--text3); letter-spacing: 0.08em; text-transform: uppercase; }
+.feed-hdr h1, .feed-hdr h2 { font-family: 'Syne', sans-serif; font-size: 11px; font-weight: 600; color: var(--text3); letter-spacing: 0.08em; text-transform: uppercase; }
 .refresh-btn { font-size: 12px; color: var(--green); background: var(--green-light); border: none; border-radius: 6px; padding: 5px 11px; cursor: pointer; font-family: 'DM Sans', sans-serif; transition: opacity 0.15s; }
 .refresh-btn:hover { opacity: 0.8; }
 
@@ -323,6 +360,13 @@ footer span { font-size: 12px; color: var(--text3); }
 </div>
 
 <!-- Topbar -->
+<noscript>
+  <div style="max-width:720px;margin:24px auto;padding:0 16px;font-family:sans-serif;line-height:1.6">
+    <h1>Quickgeo — Live Geopolitics &amp; World News</h1>
+    <p>Quickgeo is a live news feed covering wars and conflicts, international relations, diplomacy, elections, sanctions and strategic developments. The feed loads with JavaScript; enable it to read the latest updates.</p>
+    <p><a href="/about.html">About Quickgeo</a> · <a href="/contact.html">Contact</a> · <a href="/privacy.html">Privacy Policy</a> · <a href="/sitemap.xml">Sitemap</a></p>
+  </div>
+</noscript>
 <header class="topbar">
   <button class="icon-btn" id="menuBtn" onclick="openSideMenu()" aria-label="Open menu" style="margin-right:2px">☰</button>
   <a class="logo" href="#" aria-label="Quickgeo home">
@@ -391,7 +435,7 @@ footer span { font-size: 12px; color: var(--text3); }
 
       <div class="feed-hdr">
         <div>
-          <h2 id="lblLatest">Latest Updates</h2>
+          <h1 id="lblLatest">Latest Updates</h1>
           <p class="feed-tagline">Geopolitics, conflicts and world affairs — updated live.</p>
         </div>
         <button class="refresh-btn" id="lblRefresh" onclick="loadPosts()">↻ Refresh</button>
