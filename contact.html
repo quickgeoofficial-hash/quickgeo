@@ -63,8 +63,8 @@
     <button type="submit" id="submitBtn">
       <span id="btnText">Send Message</span>
     </button>
-    <div class="sent" id="sentMsg">✓ Message sent! We'll be in touch soon.</div>
-    <div class="error" id="errorMsg">⚠ Something went wrong. Please try again or email us directly.</div>
+    <div class="sent" id="sentMsg">Message sent! We'll be in touch soon.</div>
+    <div class="error" id="errorMsg">Something went wrong. Please try again or email us directly.</div>
   </form>
 </div>
 
@@ -79,7 +79,7 @@ form.addEventListener('submit', async function(e) {
   e.preventDefault();
   sentMsg.style.display = 'none';
   errorMsg.style.display = 'none';
-  errorMsg.textContent = '⚠ Something went wrong. Please try again or email us directly.';
+  errorMsg.textContent = 'Something went wrong. Please try again or email us directly.';
   btn.disabled = true;
   btnText.textContent = 'Sending…';
 
@@ -97,7 +97,7 @@ form.addEventListener('submit', async function(e) {
       form.reset();
       setTimeout(() => { sentMsg.style.display = 'none'; }, 5000);
     } else {
-      if (data.error) errorMsg.textContent = '⚠ ' + data.error;
+      if (data.error) errorMsg.textContent = data.error;
       throw new Error(data.error || 'Form submission failed');
     }
   } catch (err) {
