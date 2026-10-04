@@ -1234,6 +1234,7 @@ async function renderPostBatch(feed, posts, needsTr, fromCache) {
     posts.map(p => needsTr ? translateText(p.text, lang) : Promise.resolve(p.text))
   );
   posts.forEach((post, i) => {
+    if (document.getElementById('post-' + post.id)) return; // already shown (e.g. shared post inserted at top)
     maybeInsertAd(feed);
     _feedRenderIndex++;
     const body = translations[i] || '';
@@ -1641,13 +1642,48 @@ function hideNewPostsBanner() {
 /* ════════════════════════════
    SCROLL TO SHARED POST
 ════════════════════════════ */
-function scrollToLinkedPost() {
+/* Keep the shared post centred while images/ads above it finish loading and shift the layout.
+   Stops as soon as the reader scrolls/touches, or after a few seconds. */
+function holdAnchor(el, ms = 4000) {
+  let userMoved = false;
+  const stop = () => { userMoved = true; };
+  ['wheel', 'touchstart', 'keydown', 'mousedown'].forEach(ev => window.addEventListener(ev, stop, { once: true, passive: true }));
+  const t0 = Date.now();
+  const timer = setInterval(() => {
+    if (userMoved || Date.now() - t0 > ms || !el.isConnected) { clearInterval(timer); return; }
+    const r = el.getBoundingClientRect();
+    const drift = (r.top + r.height / 2) - window.innerHeight / 2;
+    // tall posts: align the top a little below the header instead of centring
+    const target = r.height > window.innerHeight * 0.8 ? r.top - 70 : drift;
+    if (Math.abs(target) > 12) window.scrollBy({ top: target, behavior: 'instant' });
+  }, 150);
+}
+
+/* Land directly on the shared post. If it isn't in the first page of the feed
+   (older post), fetch it by id and show it at the top instead of silently doing nothing. */
+async function scrollToLinkedPost() {
   const hash = location.hash;
   if (!hash || !hash.startsWith('#post-')) return;
-  const el = document.getElementById(hash.slice(1));
+  const pid = hash.slice(6);
+  let el = document.getElementById('post-' + pid);
+
+  if (!el && /^\d+$/.test(pid) && API.isConfigured()) {
+    try {
+      const post = await API.get('/api/posts/' + pid);
+      if (post && post.id != null) {
+        const needsTr = lang !== 'en';
+        const body = needsTr ? await translateText(post.text, lang) : post.text;
+        el = createPostCardElement(post, body || '', needsTr && body && body !== post.text);
+        const feed = document.getElementById('postFeed');
+        feed.insertBefore(el, feed.firstChild);
+      }
+    } catch (e) { console.warn('Shared post fetch failed:', e.message); }
+  }
   if (!el) return;
+
   el.classList.add('highlight-target');
-  setTimeout(() => { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 300);
+  el.scrollIntoView({ behavior: 'instant', block: 'center' });
+  holdAnchor(el);
   setTimeout(() => el.classList.remove('highlight-target'), 3000);
 }
 
@@ -1680,7 +1716,7 @@ populateAdsterraSlots();
 loadPosts().then(async () => {
   const hasShareLink = location.hash && location.hash.startsWith('#post-');
   if (hasShareLink) {
-    scrollToLinkedPost(); // explicit shared link always wins over saved position
+    await scrollToLinkedPost(); // explicit shared link always wins over saved position
   } else {
     checkForNewPosts();          // show "new posts" pill if content arrived since last visit
     await restoreReadingPosition(); // then jump back to where they left off
