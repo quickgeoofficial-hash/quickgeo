@@ -6,3 +6,4 @@ Disallow: /qg-admin-panel.html
 Disallow: /qg-secure-login.html
 
 Sitemap: https://quickgeo.live/sitemap.xml
+Sitemap: https://quickgeo.live/news-sitemap.xml
