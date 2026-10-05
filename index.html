@@ -33,6 +33,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="dns-prefetch" href="https://www.highrevenueformat.com">
 <link rel="dns-prefetch" href="https://pl31586565.profitableratecpmnetwork.com">
+<link rel="dns-prefetch" href="https://crayondrunkcontend.com">
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
 <script type="application/ld+json">
 {
@@ -1221,9 +1222,14 @@ function createAdsterraBannerIframe(key, width, height) {
   // allow-top-navigation(-by-user-activation), allow-forms — this blocks
   // popup/redirect behavior at the browser level.
   iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin');
+  // Adsterra serves banners from two domains and both work: split load between them (random per ad),
+  // and if the chosen domain fails to load, the iframe falls back to the other one.
+  const hosts = ['https://www.highrevenueformat.com', 'https://crayondrunkcontend.com'];
+  if (Math.random() < 0.5) hosts.reverse();
   iframe.srcdoc = `<!DOCTYPE html><html><head><style>html,body{margin:0;padding:0;overflow:hidden;background:transparent;}</style></head><body>
-<script>atOptions={'key':'${key}','format':'iframe','height':${height},'width':${width},'params':{}};<\/script>
-<script src="https://www.highrevenueformat.com/${key}/invoke.js"><\/script>
+<script>atOptions={'key':'${key}','format':'iframe','height':${height},'width':${width},'params':{}};
+function __fb(){var s=document.createElement('script');s.src='${hosts[1]}/${key}/invoke.js';document.body.appendChild(s);}<\/script>
+<script src="${hosts[0]}/${key}/invoke.js" onerror="__fb()"><\/script>
 </body></html>`;
   return iframe;
 }
@@ -1252,11 +1258,21 @@ function maybeInsertAd(feed) {
       _nativeAdUsed = true;
       adCard.innerHTML = `<div class="infeed-ad-label">Advertisement</div><div id="container-660e63d3f5dd85b4f8b60722a0c34b12"></div>`;
       feed.appendChild(adCard);
-      const s = document.createElement('script');
-      s.async = true;
-      s.setAttribute('data-cfasync', 'false');
-      s.src = 'https://pl31586565.profitableratecpmnetwork.com/660e63d3f5dd85b4f8b60722a0c34b12/invoke.js';
-      document.body.appendChild(s);
+      // Adsterra serves the same native unit from two domains and both work, so split load between them
+      // (random pick per page load). If the chosen domain fails to load, fall back to the other one.
+      const NATIVE_KEY = '660e63d3f5dd85b4f8b60722a0c34b12';
+      const nativeHosts = ['https://pl31586565.profitableratecpmnetwork.com', 'https://crayondrunkcontend.com'];
+      if (Math.random() < 0.5) nativeHosts.reverse();
+      const loadNative = (i) => {
+        if (i >= nativeHosts.length) return;
+        const s = document.createElement('script');
+        s.async = true;
+        s.setAttribute('data-cfasync', 'false');
+        s.src = nativeHosts[i] + '/' + NATIVE_KEY + '/invoke.js';
+        s.onerror = () => { s.remove(); loadNative(i + 1); };
+        document.body.appendChild(s);
+      };
+      loadNative(0);
     } else {
       // Every subsequent in-feed slot: sandboxed 300x250 Banner (safe to repeat)
       const labelDiv = document.createElement('div');
