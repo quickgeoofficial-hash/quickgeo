@@ -1138,7 +1138,7 @@ async function sendNotify(id, btn) {
     const r = await API.post(`/api/posts/${id}/notify`, {}, true);
     if (r.notified) {
       post.notifiedAt = r.notifiedAt;
-      showToast(`🔔 Notification sent to ${r.sent} device${r.sent !== 1 ? 's' : ''}`);
+      showToast(`🔔 Sent to ${r.sent} device${r.sent !== 1 ? 's' : ''}` + (r.failed ? ` · ${r.failed} failed` : '') + (r.removed ? ` · ${r.removed} expired removed` : ''), r.failed ? 'err' : 'ok');
     } else {
       showToast(r.message || 'Nothing was sent.', 'err');
     }
