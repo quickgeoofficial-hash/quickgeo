@@ -492,6 +492,8 @@ const API = {
   base() { return (localStorage.getItem('qg_server') || DEFAULT_SERVER).replace(/\/$/, ''); },
   isConfigured() { return !!this.base(); },
   async get(path) {
+    // Live-update refresh (triggered by SSE) skips the edge cache so new posts appear instantly
+    if (window.__qgFresh) path += (path.includes('?') ? '&' : '?') + '_f=' + Date.now();
     const r = await fetch(this.base() + path);
     if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
     return r.json();
@@ -1587,7 +1589,8 @@ let _sseReloadTimer = null;
           // would silently discard everything past page 1
           if (window.scrollY > 150) return;
           const saved = window.scrollY;
-          loadPosts().then(() => requestAnimationFrame(() => window.scrollTo({ top: saved, behavior: 'instant' })));
+          window.__qgFresh = true;
+          loadPosts().then(() => requestAnimationFrame(() => window.scrollTo({ top: saved, behavior: 'instant' }))).finally(() => { window.__qgFresh = false; });
         }, 400);
       }
     } catch {}
@@ -1615,6 +1618,8 @@ if ('serviceWorker' in navigator) {
    for a post the admin explicitly pressed "Notify" on.
 ════════════════════════════ */
 const NOTIF_SYNC_KEY = 'qg_push_synced';
+const NOTIF_OPTOUT_KEY = 'qg_notif_optout'; // set only when the user turns notifications OFF with the bell
+const NOTIF_ASKED_KEY = 'qg_notif_asked';   // we ask automatically only once per browser
 const _isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
 const pushSupported = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
 
@@ -1656,14 +1661,14 @@ async function refreshNotifBtn() {
   btn.setAttribute('aria-label', label); btn.title = label;
 }
 
-async function enableNotifications() {
+async function enableNotifications(auto) {
   if (!pushSupported()) {
-    notifToast(_isIOS ? 'On iPhone/iPad, first add Quickgeo to your Home Screen (Share → Add to Home Screen), then turn on notifications from the app.' : 'Notifications are not supported in this browser.');
+    if (!auto) notifToast(_isIOS ? 'On iPhone/iPad, first add Quickgeo to your Home Screen (Share → Add to Home Screen), then turn on notifications from the app.' : 'Notifications are not supported in this browser.');
     return;
   }
-  const perm = await Notification.requestPermission(); // must run straight from the tap
+  const perm = await Notification.requestPermission(); // must run straight from a tap/click
   if (perm !== 'granted') {
-    notifToast(perm === 'denied' ? 'Notifications are blocked. Allow them in your browser’s site settings, then tap the bell again.' : 'Notifications were not turned on.');
+    if (!auto) notifToast(perm === 'denied' ? 'Notifications are blocked. Allow them in your browser’s site settings, then tap the bell again.' : 'Notifications were not turned on.');
     return refreshNotifBtn();
   }
   try {
@@ -1672,13 +1677,15 @@ async function enableNotifications() {
     const key = b64ToBytes(publicKey);
     let sub = await reg.pushManager.getSubscription();
     if (sub && !sameKey(sub, key)) { await sub.unsubscribe(); sub = null; } // server key changed → resubscribe cleanly
+    const isNew = !sub;
     if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
     await API.post('/api/push/subscribe', sub.toJSON());
     localStorage.setItem(NOTIF_SYNC_KEY, String(Date.now()));
-    notifToast('🔔 Notifications on — you’ll be alerted when Quickgeo flags an important update.');
+    localStorage.removeItem(NOTIF_OPTOUT_KEY);
+    if (!auto || isNew) notifToast('🔔 Notifications on — tap the bell any time to turn them off.');
   } catch (e) {
     console.warn('Enable notifications failed:', e.message);
-    notifToast('Could not turn on notifications. Please try again later.');
+    if (!auto) notifToast('Could not turn on notifications. Please try again later.');
   }
   refreshNotifBtn();
 }
@@ -1693,6 +1700,7 @@ async function disableNotifications() {
       try { await API.post('/api/push/unsubscribe', { endpoint }); } catch {}
     }
     localStorage.removeItem(NOTIF_SYNC_KEY);
+    localStorage.setItem(NOTIF_OPTOUT_KEY, '1'); // remember: don't switch them back on automatically
     notifToast('Notifications turned off.');
   } catch (e) { notifToast('Could not turn off notifications.'); }
   refreshNotifBtn();
@@ -1720,7 +1728,28 @@ async function resyncNotifications() {
     localStorage.setItem(NOTIF_SYNC_KEY, String(Date.now()));
   } catch {}
 }
+/* ON BY DEFAULT: every visitor is subscribed unless they turn it off.
+   - Already allowed in the browser → subscribe silently (no prompt).
+   - Not asked yet → show the browser's Allow prompt on their first tap/key press
+     (browsers require a user gesture; asked only once, never nagged).
+   - Blocked, or turned off with the bell → left alone. */
+function autoEnableNotifications() {
+  if (!pushSupported() || localStorage.getItem(NOTIF_OPTOUT_KEY)) return;
+  const perm = Notification.permission;
+  if (perm === 'denied') return;
+  if (perm === 'granted') { enableNotifications(true); return; }
+  if (localStorage.getItem(NOTIF_ASKED_KEY)) return;
+  const evs = ['click', 'touchend', 'keydown'];
+  const go = e => {
+    if (e.target && e.target.closest && e.target.closest('#notifBtn')) return; // the bell handles its own tap
+    evs.forEach(ev => document.removeEventListener(ev, go));
+    localStorage.setItem(NOTIF_ASKED_KEY, '1');
+    enableNotifications(true);
+  };
+  evs.forEach(ev => document.addEventListener(ev, go, { passive: true }));
+}
 refreshNotifBtn();
+setTimeout(autoEnableNotifications, 2500);
 setTimeout(resyncNotifications, 4000);
 
 /* Tapping a notification while the site is already open: jump to that post. */
