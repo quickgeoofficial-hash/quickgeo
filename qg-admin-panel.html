@@ -147,26 +147,30 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .pmedia { width: 100%; max-height: 160px; object-fit: cover; display: block; }
 .preacts { padding: 5px 13px 9px; display: flex; flex-wrap: wrap; gap: 5px; }
 .rpill { font-size: 12px; background: var(--surface2); border: 1px solid var(--border); border-radius: 20px; padding: 2px 9px; }
-.pactions { padding: 0 13px 10px; display: flex; gap: 7px; border-top: 1px solid var(--border); padding-top: 8px; margin-top: 1px; }
+.pactions { padding: 0 13px 10px; display: flex; flex-wrap: wrap; gap: 7px; border-top: 1px solid var(--border); padding-top: 8px; margin-top: 1px; }
 .act-pin { font-size: 12px; color: var(--amber); background: var(--amber-light); border: 1px solid var(--amber-border); border-radius: 6px; padding: 4px 10px; cursor: pointer; font-family: 'DM Sans', sans-serif; }
 .act-del { font-size: 12px; color: var(--red); background: var(--red-light); border: 1px solid var(--red-border); border-radius: 6px; padding: 4px 10px; cursor: pointer; font-family: 'DM Sans', sans-serif; transition: all 0.15s; }
 .act-reply { font-size: 12px; color: var(--green); background: var(--green-light); border: 1px solid var(--green); border-radius: 6px; padding: 4px 10px; cursor: pointer; font-family: 'DM Sans', sans-serif; transition: all 0.15s; }
 .act-edit  { font-size: 12px; color: #b07800; background: rgba(255,180,0,0.1); border: 1px solid rgba(255,180,0,0.35); border-radius: 6px; padding: 4px 10px; cursor: pointer; font-family: 'DM Sans', sans-serif; transition: all 0.15s; }
-.act-notify { font-size: 12px; color: var(--text); background: var(--surface2); border: 1px solid var(--border2); border-radius: 6px; padding: 4px 10px; cursor: pointer; font-family: 'DM Sans', sans-serif; transition: all 0.15s; }
-.act-notify:hover:not(:disabled) { background: var(--green); color: #fff; border-color: var(--green); }
-.act-notify:disabled { opacity: .6; cursor: default; }
-.notified-badge { font-size: 12px; color: var(--green-dark); background: var(--green-light); border: 1px solid var(--green); border-radius: 6px; padding: 4px 10px; font-family: 'DM Sans', sans-serif; cursor: default; }
-.notify-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 11px 13px; border: 1px solid var(--border2); border-radius: 10px; background: var(--surface2); }
-.nb-title { font-size: 13px; font-weight: 600; color: var(--text); }
-.nb-sub { font-size: 12px; color: var(--text2); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 46ch; }
-.nb-btn { flex-shrink: 0; font-size: 13px; font-weight: 600; padding: 8px 18px; border-radius: 8px; border: 1px solid var(--green); background: var(--green-light); color: var(--green-dark); cursor: pointer; font-family: 'DM Sans', sans-serif; transition: all 0.15s; }
-.nb-btn:hover:not(:disabled) { background: var(--green); color: #fff; }
-.nb-btn:disabled { opacity: .65; cursor: default; }
-.nb-btn.done { background: var(--green); color: #fff; opacity: 1; }
 .act-reply:hover { background: var(--green); color: #fff; }
 .act-edit:hover  { background: rgba(255,180,0,0.22); }
 .ppin-lbl { font-size: 11px; color: var(--amber); font-weight: 500; padding: 5px 13px 0; }
 .empty-msg { text-align: center; padding: 36px 16px; color: var(--text3); font-size: 13px; }
+
+/* NOTIFY (admin-triggered push) */
+.act-notify { font-size: 12px; color: #2a6fdb; background: rgba(42,111,219,0.1); border: 1px solid rgba(42,111,219,0.35); border-radius: 6px; padding: 4px 10px; cursor: pointer; font-family: 'DM Sans', sans-serif; transition: all 0.15s; }
+.act-notify:hover:not(:disabled) { background: rgba(42,111,219,0.2); }
+.act-notify.confirming { color: #fff; background: #2a6fdb; border-color: #2a6fdb; }
+.act-notify:disabled, .nb-btn:disabled { cursor: not-allowed; opacity: 0.6; }
+.act-notify.done, .nb-btn.done { color: var(--green-dark); background: var(--green-light); border-color: var(--green); opacity: 1; cursor: default; }
+[data-theme="dark"] .act-notify.done, [data-theme="dark"] .nb-btn.done { color: #5DCAA5; }
+.notify-bar { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--border2); border-radius: 10px; background: var(--surface2); }
+.nb-info { flex: 1; min-width: 0; }
+.nb-title { font-size: 11px; font-weight: 500; color: var(--text2); text-transform: uppercase; letter-spacing: 0.05em; display: flex; gap: 8px; align-items: baseline; }
+.nb-subs { text-transform: none; letter-spacing: 0; color: var(--text3); }
+.nb-post { font-size: 13px; color: var(--text); margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nb-btn { flex-shrink: 0; font-size: 13px; font-weight: 500; color: #fff; background: #2a6fdb; border: 1px solid #2a6fdb; border-radius: 8px; padding: 8px 14px; cursor: pointer; font-family: 'DM Sans', sans-serif; }
+.nb-btn.confirming { background: var(--amber); border-color: var(--amber); color: #1a1a18; }
 
 /* TOAST */
 .toast { position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%); background: var(--text); color: var(--surface); font-size: 13px; font-weight: 500; padding: 9px 18px; border-radius: 20px; z-index: 999; animation: fadeInOut 2.5s ease forwards; pointer-events: none; }
@@ -319,13 +323,13 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
             <div class="gif-grid" id="gifGrid"></div>
           </div>
 
-          <!-- Manual notification: nothing is ever sent when a post is published; the admin presses Notify. -->
+          <!-- NOTIFY — never automatic. Sends ONE push for your latest post, only when you press it. -->
           <div class="notify-bar" id="notifyBar">
-            <div>
-              <div class="nb-title">Notify subscribers</div>
-              <div class="nb-sub" id="nbSub">Publish a post to enable this.</div>
+            <div class="nb-info">
+              <div class="nb-title">🔔 Notify users <span class="nb-subs" id="nbSubs"></span></div>
+              <div class="nb-post" id="nbPost">Publish a post first.</div>
             </div>
-            <button type="button" class="nb-btn" id="nbBtn" onclick="notifyLatestPost()" disabled>Notify</button>
+            <button class="nb-btn" id="nbBtn" type="button" disabled>🔔 Notify</button>
           </div>
 
           <button class="pub-btn" id="pubBtn" onclick="publishPost()">Publish Post →</button>
@@ -921,78 +925,6 @@ let _adminNextCursor = null;
 let _adminHasMore = false;
 let _adminPinned = [];
 
-/* ════════════════════════════
-   MANUAL NOTIFICATIONS
-   Publishing never notifies anyone. The admin presses Notify (here above Publish, or on any post in the list).
-   The server marks the post as notified, so a post can only ever be notified once.
-════════════════════════════ */
-let _pushStats = { enabled: true, subscribers: null };
-let _notifyBusy = false;
-
-async function loadPushStats() {
-  try { _pushStats = await API.get('/api/push/stats'); } catch { /* keep previous value */ }
-}
-function postSnippet(p, n = 70) {
-  const t = String((p && p.text) || '').replace(/\s+/g, ' ').trim();
-  return t ? (t.length > n ? t.slice(0, n - 1) + '…' : t) : `${(p && p.tag) || 'Post'} (media)`;
-}
-function latestPost() {
-  return _cachedPosts.reduce((a, p) => (!a || p.id > a.id ? p : a), null);
-}
-function updateNotifyBar() {
-  const bar = document.getElementById('notifyBar'), btn = document.getElementById('nbBtn'), sub = document.getElementById('nbSub');
-  if (!bar) return;
-  const p = latestPost();
-  const subs = _pushStats.subscribers;
-  const subsTxt = subs == null ? '' : ` · ${subs} subscriber${subs === 1 ? '' : 's'}`;
-  btn.classList.remove('done');
-  if (!p) { sub.textContent = 'Publish a post to enable this.'; btn.textContent = 'Notify'; btn.disabled = true; return; }
-  if (_pushStats.enabled === false) {
-    sub.textContent = 'Not set up on the server yet (run npm install, then restart).';
-    btn.textContent = 'Notify'; btn.disabled = true; return;
-  }
-  sub.textContent = `Latest post: ${postSnippet(p)}${subsTxt}`;
-  if (_notifyBusy) { btn.textContent = 'Sending…'; btn.disabled = true; return; }
-  if (p.notifiedAt) { btn.textContent = '✓ Notified'; btn.disabled = true; btn.classList.add('done'); return; }
-  btn.textContent = 'Notify'; btn.disabled = false;
-}
-function notifyLatestPost() {
-  const p = latestPost();
-  return p ? notifyPost(p.id, document.getElementById('nbBtn')) : undefined;
-}
-async function notifyPost(id, btn) {
-  if (_notifyBusy) return;
-  const post = _cachedPosts.find(p => p.id === id);
-  if (!post) { showToast('Post not found — refresh the list', 'err'); return; }
-  if (post.notifiedAt) { showToast('This post was already notified.', 'err'); return; }
-  if (!confirm(`Send a notification about this post to everyone who enabled notifications?\n\n"${postSnippet(post, 120)}"\n\nThis can only be done once per post.`)) return;
-
-  _notifyBusy = true;
-  const label = btn ? btn.textContent : '';
-  if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
-  updateNotifyBar();
-  try {
-    const r = await API.post(`/api/posts/${id}/notify`, {}, true);
-    if (r.notifiedAt) {
-      post.notifiedAt = r.notifiedAt;
-      showToast(`✓ Notification sent to ${r.sent} subscriber${r.sent === 1 ? '' : 's'}`);
-    } else {
-      showToast(r.message || 'No one has enabled notifications yet.', 'err');   // nothing sent: stays un-notified
-    }
-  } catch (e) {
-    showToast(`❌ ${e.message}`, 'err');
-    if (/already been notified/i.test(e.message)) post.notifiedAt = post.notifiedAt || new Date().toISOString();
-    if (btn) btn.textContent = label;
-  } finally {
-    _notifyBusy = false;
-    await loadPushStats();
-    // redraw this post's card so its button becomes "Notified"
-    const old = document.getElementById('post-' + id);
-    if (old && old.parentNode) old.replaceWith(createAdminPostCardElement(post));
-    updateNotifyBar();
-  }
-}
-
 function createAdminPostCardElement(post) {
   const card = document.createElement('div');
   card.className = 'pcard';
@@ -1025,11 +957,10 @@ function createAdminPostCardElement(post) {
       <button class="act-reply" data-action="reply" data-pid="${post.id}">↩ Reply</button>
       <button class="act-edit"  data-action="edit"  data-pid="${post.id}">✏️ Edit</button>
       <button class="act-pin"   data-action="pin"   data-pid="${post.id}">${post.pinned?'📌 Unpin':'📌 Pin'}</button>
-      ${post.notifiedAt
-        ? `<span class="notified-badge" title="Notified ${escapeHtml(new Date(post.notifiedAt).toLocaleString())}">✓ Notified</span>`
-        : `<button class="act-notify" data-action="notify" data-pid="${post.id}">Notify</button>`}
+      <button class="act-notify" data-action="notify" data-pid="${post.id}">🔔 Notify</button>
       <button class="act-del"   data-action="del"   data-pid="${post.id}">🗑 Delete</button>
     </div>`;
+  paintNotifyButton(card.querySelector('.act-notify'), post);
   return card;
 }
 
@@ -1093,6 +1024,7 @@ async function renderAdminFeed() {
       <div style="margin-top:8px"><button onclick="openServerModal()" style="color:var(--green);background:var(--green-light);border:1px solid var(--green);border-radius:7px;padding:5px 12px;cursor:pointer;font-family:DM Sans,sans-serif;font-size:13px;">Connect →</button></div>
     </div>`;
     if (countEl) countEl.textContent = '—';
+    renderNotifyBar();
     return;
   }
 
@@ -1111,19 +1043,117 @@ async function renderAdminFeed() {
     if (page.posts.length) _adminNextCursor = page.posts[page.posts.length - 1].id;
 
     _cachedPosts = [..._adminPinned, ...page.posts]; // cache for edit/reply/pin lookups
+    renderNotifyBar();
     const totalKnown = _cachedPosts.length;
     if (countEl) countEl.textContent = `${totalKnown} post${totalKnown !== 1 ? 's' : ''}${_adminHasMore ? '+' : ''}`;
 
-    if (!_cachedPosts.length) { feed.innerHTML = '<div class="empty-msg">No posts yet. Publish your first update!</div>'; updateNotifyBar(); return; }
+    if (!_cachedPosts.length) { feed.innerHTML = '<div class="empty-msg">No posts yet. Publish your first update!</div>'; return; }
 
     feed.innerHTML = '';
     _cachedPosts.forEach(post => feed.appendChild(createAdminPostCardElement(post)));
     renderAdminLoadMoreButton(feed);
-    updateNotifyBar();
   } catch (e) {
     feed.innerHTML = `<div class="empty-msg" style="color:var(--red)">⚠ Could not load posts.<br><small>${escapeHtml(e.message)}</small></div>`;
   }
 }
+
+/* ════════════════════════════
+   NOTIFY — admin-triggered push (never automatic)
+   Server enforces once-per-post atomically; the UI just reflects it.
+════════════════════════════ */
+let _pushInfo = { enabled: null, subscribers: 0 };   // enabled: null = not checked yet
+const _notifyBusy = new Set();
+
+async function loadPushStats() {
+  if (!API.isOk()) return;
+  try {
+    const s = await API.get('/api/push/stats');
+    _pushInfo = { enabled: !!s.enabled, subscribers: s.subscribers || 0 };
+  } catch (e) {
+    if (e.message === 'Unauthorized') return;
+    _pushInfo = { enabled: false, subscribers: 0 };   // older server without push, or unreachable
+  }
+  repaintAllNotify();
+}
+
+function paintNotifyButton(btn, post) {
+  if (!btn || !post) return;
+  delete btn.dataset.confirming;
+  btn.classList.remove('confirming', 'done');
+  btn.disabled = false; btn.title = '';
+  if (post.notifiedAt) {
+    btn.textContent = '✓ Notified'; btn.disabled = true; btn.classList.add('done');
+    btn.title = 'Notified ' + new Date(post.notifiedAt).toLocaleString();
+  } else if (_notifyBusy.has(post.id)) {
+    btn.textContent = 'Sending…'; btn.disabled = true;
+  } else if (_pushInfo.enabled === false) {
+    btn.textContent = '🔔 Notify'; btn.disabled = true;
+    btn.title = 'Push notifications are not set up on the server (run npm install and restart it)';
+  } else {
+    btn.textContent = '🔔 Notify';
+    btn.title = 'Send a notification about this post to users who enabled notifications';
+  }
+}
+
+function latestPost() {
+  return _cachedPosts.reduce((a, p) => (!a || p.id > a.id) ? p : a, null);
+}
+
+function renderNotifyBar() {
+  const post = latestPost();
+  const btn = document.getElementById('nbBtn'), txt = document.getElementById('nbPost'), subs = document.getElementById('nbSubs');
+  if (!btn) return;
+  subs.textContent = _pushInfo.enabled ? `· ${_pushInfo.subscribers} subscriber${_pushInfo.subscribers !== 1 ? 's' : ''}` : '';
+  if (!post) { txt.textContent = 'Publish a post first.'; btn.textContent = '🔔 Notify'; btn.disabled = true; delete btn.dataset.pid; return; }
+  txt.textContent = `Latest: ${post.tagEmoji || ''} ${post.tag} — ${(post.text || '(media)').replace(/\s+/g, ' ').slice(0, 80)}`;
+  btn.dataset.pid = post.id;
+  paintNotifyButton(btn, post);
+}
+
+function repaintNotifyUI(id) {
+  const post = _cachedPosts.find(p => p.id === id);
+  paintNotifyButton(document.querySelector(`#post-${id} .act-notify`), post);
+  renderNotifyBar();
+}
+function repaintAllNotify() {
+  _cachedPosts.forEach(p => paintNotifyButton(document.querySelector(`#post-${p.id} .act-notify`), p));
+  renderNotifyBar();
+}
+
+async function sendNotify(id, btn) {
+  if (!API.isOk()) { openServerModal(); return; }
+  const post = _cachedPosts.find(p => p.id === id);
+  if (!post || post.notifiedAt || _notifyBusy.has(id) || _pushInfo.enabled === false) return;
+
+  // Step 1 — first tap only arms the button. Step 2 (within 4s) actually sends.
+  if (!btn.dataset.confirming) {
+    btn.dataset.confirming = '1'; btn.classList.add('confirming');
+    btn.textContent = '⚠ Tap again to send';
+    setTimeout(() => { if (btn.dataset.confirming) repaintNotifyUI(id); }, 4000);
+    return;
+  }
+
+  _notifyBusy.add(id); repaintNotifyUI(id);          // disables the post's button everywhere
+  try {
+    const r = await API.post(`/api/posts/${id}/notify`, {}, true);
+    if (r.notified) {
+      post.notifiedAt = r.notifiedAt;
+      showToast(`🔔 Notification sent to ${r.sent} device${r.sent !== 1 ? 's' : ''}`);
+    } else {
+      showToast(r.message || 'Nothing was sent.', 'err');
+    }
+  } catch (e) {
+    if (/already/i.test(e.message)) { post.notifiedAt = post.notifiedAt || new Date().toISOString(); showToast('This post was already notified.'); }
+    else showToast(`❌ ${e.message}`, 'err');
+  } finally {
+    _notifyBusy.delete(id); repaintNotifyUI(id); loadPushStats();
+  }
+}
+
+document.getElementById('nbBtn').addEventListener('click', e => {
+  const pid = Number(e.currentTarget.dataset.pid);
+  if (pid) sendNotify(pid, e.currentTarget);
+});
 
 /* ── DELEGATION: post pin / delete / edit / reply (data-pid) ── */
 document.getElementById('adminFeed').addEventListener('click', e => {
@@ -1136,7 +1166,7 @@ document.getElementById('adminFeed').addEventListener('click', e => {
   else if (action === 'del')   confirmDelete(pid, btn);
   else if (action === 'edit')  startEdit(pid);
   else if (action === 'reply') startReply(pid);
-  else if (action === 'notify') notifyPost(pid, btn);
+  else if (action === 'notify') sendNotify(pid, btn);
 });
 async function fetchCatsAPI() {
   try {
@@ -1273,8 +1303,8 @@ async function init() {
   }
 
   await renderCatSelect();
-  await loadPushStats();
   await renderAdminFeed();
+  loadPushStats();
 }
 
 // Hash routing
