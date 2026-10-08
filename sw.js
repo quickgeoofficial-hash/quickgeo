@@ -1,4 +1,4 @@
-const CACHE = 'qg-user-v4';
+const CACHE = 'qg-user-v3';
 const CORE = ['./index.html', './manifest.json'];
 
 self.addEventListener('install', e => {
@@ -47,33 +47,35 @@ self.addEventListener('fetch', e => {
   );
 });
 
-/* ── PUSH NOTIFICATIONS (sent only when the admin presses "Notify" on a post) ── */
+/* ════════════════════════════
+   WEB PUSH — admin-triggered post notifications
+   (only fires when the admin presses "Notify" on a post)
+════════════════════════════ */
 self.addEventListener('push', e => {
   let d = {};
   try { d = e.data ? e.data.json() : {}; } catch { d = { body: e.data ? e.data.text() : '' }; }
-  const opts = {
-    body: d.body || '',
-    icon: d.icon || '/icon-192.png',
-    badge: '/icon-192.png',
-    tag: d.tag || 'qg-update',
-    data: { url: d.url || '/', postId: d.postId || null }
-  };
-  if (d.image) opts.image = d.image;
-  e.waitUntil(self.registration.showNotification(d.title || 'Quickgeo', opts));
+  const postId = /^\d{1,20}$/.test(String(d.postId || '')) ? String(d.postId) : '';
+  e.waitUntil(self.registration.showNotification(String(d.title || 'Quickgeo').slice(0, 100), {
+    body: String(d.body || '').slice(0, 300),
+    icon: './icon-192.png',
+    tag: postId ? 'qg-post-' + postId : 'qg-update', // same post can never stack twice on screen
+    data: { postId }
+  }));
 });
 
 self.addEventListener('notificationclick', e => {
   e.notification.close();
-  const url = (e.notification.data && e.notification.data.url) || '/';
+  const postId = e.notification.data && e.notification.data.postId;
+  const url = new URL(postId ? './#post-' + postId : './', self.registration.scope).href;
+  const home = new URL('./', self.registration.scope).pathname;
   e.waitUntil((async () => {
     const wins = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-    // Quickgeo already open: bring it to the front and ask it to scroll to the post (no reload needed)
-    for (const w of wins) {
-      if (new URL(w.url).origin === self.location.origin) {
-        await w.focus();
-        w.postMessage({ type: 'qg-open-post', url });
-        return;
-      }
+    const win = wins.find(c => new URL(c.url).origin === self.location.origin);
+    if (win) {
+      try { await win.focus(); } catch {}
+      const p = new URL(win.url).pathname;
+      if (postId && (p === home || p === home + 'index.html')) { win.postMessage({ type: 'qg-open-post', postId }); return; }
+      try { await win.navigate(url); return; } catch {}
     }
     await self.clients.openWindow(url);
   })());
