@@ -1679,8 +1679,13 @@ async function enableNotifications(auto) {
     if (sub && !sameKey(sub, key)) { await sub.unsubscribe(); sub = null; } // server key changed → resubscribe cleanly
     const isNew = !sub;
     if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
-    await API.post('/api/push/subscribe', sub.toJSON());
-    localStorage.setItem(NOTIF_SYNC_KEY, String(Date.now()));
+    // Auto (page-load) runs only re-register with the server once a day. Re-POSTing on every visit
+    // burns the per-IP rate limit (60/10min) for visitors sharing one mobile-carrier IP.
+    const recentlySynced = Date.now() - Number(localStorage.getItem(NOTIF_SYNC_KEY) || 0) < 864e5;
+    if (!(auto && !isNew && recentlySynced)) {
+      await API.post('/api/push/subscribe', sub.toJSON());
+      localStorage.setItem(NOTIF_SYNC_KEY, String(Date.now()));
+    }
     localStorage.removeItem(NOTIF_OPTOUT_KEY);
     if (!auto || isNew) notifToast('🔔 Notifications on — tap the bell any time to turn them off.');
   } catch (e) {
