@@ -32,7 +32,8 @@ self.addEventListener('fetch', e => {
 
   // NEVER intercept these — always go straight to network
   if (
-    url.includes('trycloudflare.com') ||  // phone server (API + uploads)
+    url.includes('api.quickgeo.live') ||  // phone server (API + uploads + SSE stream)
+    url.includes('trycloudflare.com') ||
     url.includes('cloudflare.com') ||
     url.includes('giphy.com') ||
     url.includes('translate.googleapis.com') ||
