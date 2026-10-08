@@ -98,6 +98,20 @@ function explain(status) {
   return 'network error or timeout reaching the push service from this server';
 }
 
+/* Mobile connections to Google/Apple/Mozilla push services drop now and then. Retry network errors,
+   429 and 5xx up to 3 times with a short backoff; real rejections (400/401/403/404/410) fail at once. */
+async function sendWithRetry(sub, payload, opts) {
+  for (let attempt = 1; ; attempt++) {
+    try { return await webpush.sendNotification(sub, payload, opts); }
+    catch (e) {
+      const st = e && e.statusCode;
+      const retryable = !st || st === 429 || st >= 500;
+      if (!retryable || attempt >= 3) throw e;
+      await new Promise(r => setTimeout(r, 800 * attempt));
+    }
+  }
+}
+
 function init({ app, db, adminOnly, rateLimit, dataDir }) {
   try { const n = db.prepare("DELETE FROM push_subscriptions WHERE COALESCE(lastSeenAt,createdAt) < ?").run(new Date(Date.now() - 120 * 864e5).toISOString()).changes; if (n) console.log(`[PUSH] pruned ${n} stale subscription(s)`); } catch {}
   let enabled = false, vapid = null;
@@ -166,8 +180,8 @@ function init({ app, db, adminOnly, rateLimit, dataDir }) {
       for (let i = 0; i < subs.length; i += SEND_BATCH) {
         await Promise.all(subs.slice(i, i + SEND_BATCH).map(async s => {
           try {
-            await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
-              payload, { TTL: 86400, urgency: 'high', topic: 'qg' + id, timeout: 10000 });
+            await sendWithRetry({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
+              payload, { TTL: 86400, urgency: 'high', topic: 'qg' + id, timeout: 15000 });
             sent++;
           } catch (e) {
             if (e && (e.statusCode === 404 || e.statusCode === 410)) { drop.run(s.endpoint); removed++; } // user revoked / uninstalled
