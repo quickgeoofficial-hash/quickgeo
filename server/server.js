@@ -31,6 +31,46 @@ CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires);
 CREATE INDEX IF NOT EXISTS idx_posts_tag ON posts(tag);
 CREATE INDEX IF NOT EXISTS idx_posts_id_pinned0 ON posts(id DESC) WHERE pinned = 0;
 `);
+/* ── WEB PUSH NOTIFICATIONS ──
+   Notifications are NEVER sent automatically. Publishing a post sends nothing; only the admin pressing
+   "Notify" (POST /api/posts/:id/notify) sends one, and each post can be notified exactly once.
+   Users opt in from the site menu; their browser subscription is stored in push_subs. */
+let webpush=null;
+try{webpush=require('web-push');}catch{console.warn('[PUSH] "web-push" is not installed — run "npm install" in ~/quickgeo, then restart. Notifications are disabled until then.');}
+db.exec('CREATE TABLE IF NOT EXISTS push_subs(endpoint TEXT PRIMARY KEY,p256dh TEXT NOT NULL,auth TEXT NOT NULL,createdAt INTEGER NOT NULL)');
+try{if(!db.prepare('PRAGMA table_info(posts)').all().some(c=>c.name==='notifiedAt'))db.exec('ALTER TABLE posts ADD COLUMN notifiedAt TEXT DEFAULT NULL');}catch(e){console.warn('[PUSH] posts.notifiedAt migration failed:',e.message);}
+let vapid=null;
+if(webpush){
+  try{
+    const vf=path.join(DATA_DIR,'vapid.json');
+    if(process.env.VAPID_PUBLIC_KEY&&process.env.VAPID_PRIVATE_KEY)vapid={publicKey:process.env.VAPID_PUBLIC_KEY,privateKey:process.env.VAPID_PRIVATE_KEY};
+    else if(fs.existsSync(vf))vapid=JSON.parse(fs.readFileSync(vf,'utf8'));
+    else{vapid=webpush.generateVAPIDKeys();fs.writeFileSync(vf,JSON.stringify(vapid),{mode:0o600});console.log('[PUSH] Generated VAPID keys → data/vapid.json (back this file up: if it is lost, every subscriber must re-enable notifications)');}
+    webpush.setVapidDetails(process.env.VAPID_SUBJECT||'https://quickgeo.live',vapid.publicKey,vapid.privateKey);
+  }catch(e){console.warn('[PUSH] setup failed:',e.message);vapid=null;}
+}
+// Only genuine browser push services are accepted as subscription endpoints. Without this, anyone could register
+// an arbitrary URL and make this server send requests to it (SSRF).
+const PUSH_HOSTS=['fcm.googleapis.com','push.services.mozilla.com','push.apple.com','notify.windows.com'];
+function pushEndpointOk(ep){
+  try{const u=new URL(ep);if(u.protocol!=='https:'||u.port&&u.port!=='443')return false;const h=u.hostname.toLowerCase();return PUSH_HOSTS.some(d=>h===d||h.endsWith('.'+d));}catch{return false;}
+}
+function buildPushPayload(p){
+  const clean=x=>String(x||'').replace(/\s+/g,' ').replace(/^[^\p{L}\p{N}]+/u,'').trim();
+  const text=clean(p.text);
+  const first=((text.match(/^(.{20,}?[.!?])(\s|$)/)||[])[1])||text;
+  const body=first.length>140?first.slice(0,139).replace(/\s+\S*$/,'')+'…':first;
+  const img=(p.media||[]).find(m=>m&&typeof m.url==='string'&&/^https:\/\//.test(m.url)&&(String(m.type||'').startsWith('image')||m.type==='gif'));
+  return JSON.stringify({
+    title:p.tag?`${p.tag} — Quickgeo`:'Quickgeo',
+    body:body||'New update on Quickgeo',
+    url:`https://quickgeo.live/#post-${p.id}`,      // opens the feed scrolled to this exact post
+    icon:'https://quickgeo.live/icon-192.png',
+    ...(img?{image:img.url}:{}),
+    postId:p.id,
+    tag:`qg-post-${p.id}`
+  });
+}
 const DEFAULT_CATS=[{emoji:'🔴',name:'Breaking'},{emoji:'🗺',name:'Maps'},{emoji:'🛰',name:'Satellite'},{emoji:'🌐',name:'OSM'},{emoji:'📊',name:'Data'},{emoji:'✨',name:'Feature'},{emoji:'🔄',name:'Update'}];
 if(db.prepare('SELECT COUNT(*) as n FROM categories').get().n===0){const ins=db.prepare('INSERT OR IGNORE INTO categories (emoji,name) VALUES (?,?)');DEFAULT_CATS.forEach(c=>ins.run(c.emoji,c.name));console.log('✅  Default categories seeded');}
 (function migrate(){
@@ -368,6 +408,51 @@ app.post('/api/posts/:id/react',rateLimit('react',60,60000),(req,res)=>{
   else{reactions[emoji]=(reactions[emoji]||0)+1;reactUsers[key]=true;nr=true;}
   db.prepare('UPDATE posts SET reactions=?,reactUsers=? WHERE id=?').run(JSON.stringify(reactions),JSON.stringify(reactUsers),Number(req.params.id));
   res.json({reactions,reacted:nr});
+});
+/* ── PUSH ROUTES ── */
+app.get('/api/push/key',(req,res)=>res.json({enabled:!!(webpush&&vapid),publicKey:vapid?vapid.publicKey:null}));
+app.post('/api/push/subscribe',rateLimit('push-sub',20,10*60000),(req,res)=>{
+  if(!webpush||!vapid)return res.status(503).json({error:'Notifications are unavailable'});
+  const sub=(req.body||{}).subscription||{},ep=sub.endpoint,k=sub.keys||{};
+  const b64=/^[A-Za-z0-9_-]{16,200}={0,2}$/;
+  if(typeof ep!=='string'||ep.length>2048||!pushEndpointOk(ep)||typeof k.p256dh!=='string'||typeof k.auth!=='string'||!b64.test(k.p256dh)||!b64.test(k.auth))return res.status(400).json({error:'Invalid subscription'});
+  db.prepare('INSERT OR REPLACE INTO push_subs(endpoint,p256dh,auth,createdAt) VALUES(?,?,?,?)').run(ep,k.p256dh,k.auth,Date.now());
+  res.json({ok:true});
+});
+app.post('/api/push/unsubscribe',rateLimit('push-unsub',20,10*60000),(req,res)=>{
+  const ep=(req.body||{}).endpoint;
+  if(typeof ep!=='string'||ep.length>2048)return res.status(400).json({error:'Invalid endpoint'});
+  db.prepare('DELETE FROM push_subs WHERE endpoint=?').run(ep);res.json({ok:true});
+});
+app.get('/api/push/stats',adminOnly,(req,res)=>res.json({enabled:!!(webpush&&vapid),subscribers:db.prepare('SELECT COUNT(*) AS n FROM push_subs').get().n}));
+app.post('/api/posts/:id(\\d+)/notify',adminOnly,rateLimit('notify',30,10*60000),async(req,res)=>{
+  if(!webpush||!vapid)return res.status(503).json({error:'Notifications are not set up on the server yet (run "npm install", then restart).'});
+  const id=Number(req.params.id),row=db.prepare('SELECT * FROM posts WHERE id=?').get(id);
+  if(!row)return res.status(404).json({error:'Post not found'});
+  // Atomic claim: only the request that flips notifiedAt from NULL may send. A double-click, a retry or a
+  // second admin device gets 409 instead of a duplicate notification.
+  const stamp=new Date().toISOString();
+  if(db.prepare('UPDATE posts SET notifiedAt=? WHERE id=? AND notifiedAt IS NULL').run(stamp,id).changes!==1)
+    return res.status(409).json({error:'This post has already been notified.',notifiedAt:row.notifiedAt});
+  const payload=buildPushPayload(parsePost(row)),subs=db.prepare('SELECT endpoint,p256dh,auth FROM push_subs').all();
+  let sent=0,failed=0,removed=0;
+  try{
+    for(let i=0;i<subs.length;i+=25){
+      await Promise.all(subs.slice(i,i+25).map(async s=>{
+        try{await webpush.sendNotification({endpoint:s.endpoint,keys:{p256dh:s.p256dh,auth:s.auth}},payload,{TTL:21600,urgency:'high',topic:`post-${id}`,timeout:10000});sent++;}
+        catch(e){if(e&&(e.statusCode===404||e.statusCode===410)){db.prepare('DELETE FROM push_subs WHERE endpoint=?').run(s.endpoint);removed++;}else failed++;}
+      }));
+    }
+  }catch(e){console.error('[PUSH] send loop error:',e.message);}
+  if(sent===0){
+    // Nothing was delivered: release the claim so the admin can try again, and don't show "Notified".
+    db.prepare('UPDATE posts SET notifiedAt=NULL WHERE id=?').run(id);
+    console.log(`[PUSH] post ${id}: nothing sent (${subs.length} subscriber(s), ${failed} failed, ${removed} expired)`);
+    if(!subs.length)return res.json({ok:true,sent:0,subscribers:0,notifiedAt:null,message:'No one has enabled notifications yet.'});
+    return res.status(502).json({error:'Could not deliver the notification. Please try again.'});
+  }
+  console.log(`[PUSH] post ${id}: sent ${sent}, failed ${failed}, expired removed ${removed}`);
+  res.json({ok:true,sent,failed,removed,notifiedAt:stamp});
 });
 app.get('/api/categories',(_,res)=>res.json(getCats()));
 app.post('/api/categories',adminOnly,(req,res)=>{
