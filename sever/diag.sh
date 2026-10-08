@@ -25,7 +25,8 @@ console.log('notified posts:',db.prepare('SELECT COUNT(*) n FROM posts WHERE not
 
 echo "── Can this phone reach the push services? ──"
 for h in fcm.googleapis.com updates.push.services.mozilla.com; do
-  C=$(curl -s -o /dev/null -m 8 -w '%{http_code}' https://$h/); [ "$C" != "000" ] && ok "$h reachable (HTTP $C)" || bad "$h unreachable"
+  C=000; for i in 1 2 3; do C=$(curl -s -o /dev/null -m 10 -w '%{http_code}' https://$h/); [ "$C" != "000" ] && break; done
+  [ "$C" != "000" ] && ok "$h reachable (HTTP $C, try $i)" || bad "$h unreachable after 3 tries (network problem on this phone)"
 done
 echo "── Public path ──"
 C=$(curl -s -m 8 -o /dev/null -w '%{http_code}' https://api.quickgeo.live/health); [ "$C" = "200" ] && ok "api.quickgeo.live/health → 200" || bad "api.quickgeo.live/health → $C"
