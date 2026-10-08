@@ -19,7 +19,7 @@ echo "── Subscribers (from database) ──"
 node -e "
 const {DatabaseSync}=require('node:sqlite');const db=new DatabaseSync('data/quickgeo.db');
 try{console.log('subscribers:',db.prepare('SELECT COUNT(*) n FROM push_subscriptions').get().n);
-console.log('latest subs:',db.prepare('SELECT substr(endpoint,1,45)||\"…\" e,createdAt FROM push_subscriptions ORDER BY createdAt DESC LIMIT 3').all());
+console.log('latest subs:',db.prepare('SELECT substr(endpoint,1,45) e,createdAt FROM push_subscriptions ORDER BY createdAt DESC LIMIT 3').all());
 console.log('notified posts:',db.prepare('SELECT COUNT(*) n FROM posts WHERE notifiedAt IS NOT NULL').get().n)}catch(e){console.log('push tables missing:',e.message)}
 " 2>/dev/null
 
