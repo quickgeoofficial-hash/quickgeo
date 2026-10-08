@@ -1,4 +1,4 @@
-const CACHE = 'qg-user-v3';
+const CACHE = 'qg-user-v4';
 const CORE = ['./index.html', './manifest.json'];
 
 self.addEventListener('install', e => {
@@ -45,4 +45,36 @@ self.addEventListener('fetch', e => {
       })
       .catch(() => caches.match(e.request).then(r => r || Response.error()))
   );
+});
+
+/* ── PUSH NOTIFICATIONS (sent only when the admin presses "Notify" on a post) ── */
+self.addEventListener('push', e => {
+  let d = {};
+  try { d = e.data ? e.data.json() : {}; } catch { d = { body: e.data ? e.data.text() : '' }; }
+  const opts = {
+    body: d.body || '',
+    icon: d.icon || '/icon-192.png',
+    badge: '/icon-192.png',
+    tag: d.tag || 'qg-update',
+    data: { url: d.url || '/', postId: d.postId || null }
+  };
+  if (d.image) opts.image = d.image;
+  e.waitUntil(self.registration.showNotification(d.title || 'Quickgeo', opts));
+});
+
+self.addEventListener('notificationclick', e => {
+  e.notification.close();
+  const url = (e.notification.data && e.notification.data.url) || '/';
+  e.waitUntil((async () => {
+    const wins = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    // Quickgeo already open: bring it to the front and ask it to scroll to the post (no reload needed)
+    for (const w of wins) {
+      if (new URL(w.url).origin === self.location.origin) {
+        await w.focus();
+        w.postMessage({ type: 'qg-open-post', url });
+        return;
+      }
+    }
+    await self.clients.openWindow(url);
+  })());
 });
