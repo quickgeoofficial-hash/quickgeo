@@ -1,7 +1,7 @@
 {
   "name": "quickgeo-server",
   "version": "3.4.0",
-  "description": "Quickgeo backend \u2014 runs on Android via Termux",
+  "description": "Quickgeo backend — runs on Android via Termux",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
