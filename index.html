@@ -3,6 +3,15 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<script>
+/* Quickgeo's own code never opens a new window, so any window.open() here comes from a third-party (ad) script.
+   Block it permanently (non-writable, non-configurable) so ads can't pop up tabs/windows. */
+(function () {
+  var blocked = function () { try { console.warn('[Quickgeo] blocked a popup attempt'); } catch (e) {} return null; };
+  try { Object.defineProperty(window, 'open', { value: blocked, writable: false, configurable: false }); }
+  catch (e) { try { window.open = blocked; } catch (e2) {} }
+})();
+</script>
 <title>Quickgeo — Live Geopolitics News: Middle East, Iran, Ukraine</title>
 <meta name="description" content="Live geopolitics news and war updates — Middle East, Saudi Arabia, Iran, Yemen, Israel, Palestine, Strait of Hormuz, Russia and Ukraine. Updated in real time.">
 <meta name="keywords" content="geo news, geopolitics, geopolitical news, Saudi Arabia news, Middle East, Iran news, Yemen news, Israel news, Palestine news, Strait of Hormuz, war news, Russia news, Ukraine news, Russia Ukraine war, live news">
@@ -21,7 +30,6 @@
 <meta name="twitter:title"      content="Quickgeo — Live Geopolitics News: Middle East, Iran, Ukraine">
 <meta name="twitter:description" content="Live geopolitics and war updates without the noise — Middle East, Iran, Yemen, Israel, Palestine, Russia and Ukraine.">
 <meta name="twitter:image"      content="https://quickgeo.live/logo.png">
-<meta name="yandex-verification" content="4c096051d44d2e9d" />
 <link rel="canonical"           href="https://quickgeo.live">
 <link rel="icon" type="image/png" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
@@ -1284,6 +1292,10 @@ const ADSTERRA_KEYS = {
   w300h250: 'a8a37d1a127a09825a3d59a0bffabb96',
 };
 
+/* The Native Banner is the only ad script that runs UNSANDBOXED inside the page (it has to, to blend in).
+   That makes it the one place an ad can open popups/redirects, so it is OFF. All ad slots use the sandboxed banner instead.
+   Set to true only if you accept that risk. */
+const USE_NATIVE_AD = false;
 let _nativeAdUsed = false;
 
 /* Append an in-feed ad card at the current render index if due (every 4th post) */
@@ -1294,7 +1306,7 @@ function maybeInsertAd(feed) {
     adCard.className = 'infeed-ad';
     adCard.setAttribute('aria-label', 'Advertisement');
 
-    if (!_nativeAdUsed && _feedRenderIndex > 0) {
+    if (USE_NATIVE_AD && !_nativeAdUsed && _feedRenderIndex > 0) {
       // First in-feed slot gets the Native Banner (once per page load)
       _nativeAdUsed = true;
       adCard.innerHTML = `<div class="infeed-ad-label">Advertisement</div><div id="container-660e63d3f5dd85b4f8b60722a0c34b12"></div>`;
