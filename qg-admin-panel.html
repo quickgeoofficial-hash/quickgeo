@@ -39,32 +39,33 @@
 html { padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-area-inset-right, 0px); }
 body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; transition: background 0.25s, color 0.25s; }
 
-/* TOPBAR — mirrors the public site */
-.topbar { container: tb / inline-size; position: sticky; top: 0; z-index: 200; padding: 10px 10px 8px; background: linear-gradient(to bottom, var(--bg) 70%, transparent); pointer-events: none; }
-.tb-pill { pointer-events: auto; max-width: 1100px; margin: 0 auto; height: 58px; padding: 0 10px; display: flex; align-items: center; gap: 10px; background: var(--surface); border: 1px solid var(--border2); border-radius: 22px; box-shadow: 0 6px 22px rgba(0,0,0,0.10), 0 1px 3px rgba(0,0,0,0.06); position: relative; }
-.tb-div { width: 1px; height: 26px; background: var(--border2); flex-shrink: 0; }
-.logo { text-decoration: none; font-family: 'Syne', sans-serif; font-size: 21px; font-weight: 700; letter-spacing: -0.01em; color: var(--text); display: flex; align-items: center; gap: 9px; min-width: 0; white-space: nowrap; }
-.logo > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.logo-img { width: auto; height: 36px; max-width: 30px; object-fit: contain; flex-shrink: 0; }
-.admin-badge { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; letter-spacing: .05em; background: var(--amber-light); color: #856404; border: 1px solid var(--amber-border); border-radius: 20px; padding: 6px 12px; white-space: nowrap; flex-shrink: 0; }
-[data-theme="dark"] .admin-badge { color: var(--amber); }
-.topbar-right { display: flex; align-items: center; gap: 8px; margin-left: auto; flex-shrink: 0; }
-.icon-btn { width: 38px; height: 38px; border-radius: 50%; border: 1.5px solid var(--border2); background: var(--surface2); color: var(--text); cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; flex-shrink: 0; transition: background .15s, border-color .15s, transform .1s; }
-.icon-btn:hover { background: var(--border2); } .icon-btn:active { transform: scale(.94); }
-.icon-btn svg { width: 19px; height: 19px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-.menu-btn { border-radius: 12px; border-width: 1px; }
-#themeBtn .i-sun { display: none; } [data-theme="dark"] #themeBtn .i-sun { display: block; } [data-theme="dark"] #themeBtn .i-moon { display: none; }
-.tb-menu { display: none; position: absolute; top: calc(100% + 8px); left: 0; min-width: 220px; background: var(--surface); border: 1px solid var(--border2); border-radius: 16px; box-shadow: 0 12px 32px rgba(0,0,0,.22); padding: 6px; z-index: 300; }
-.tb-menu.open { display: block; }
-.tb-menu a, .tb-menu button { display: flex; align-items: center; gap: 10px; width: 100%; padding: 11px 12px; border: 0; background: none; color: var(--text); font: 500 14px 'DM Sans', sans-serif; border-radius: 10px; cursor: pointer; text-decoration: none; text-align: left; }
-.tb-menu a:hover, .tb-menu button:hover { background: var(--surface2); }
-.tb-menu svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
-.tb-menu .danger { color: var(--red,#e24b4a); }
-.tb-menu hr { border: 0; border-top: 1px solid var(--border2); margin: 4px 6px; }
-#connLabel { max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-@container tb (max-width: 519px) { .tb-pill { gap: 8px; height: 54px; } .logo { font-size: 18px; } .admin-badge { display: none; } .tb-div.d2 { display: none; } }
-@container tb (max-width: 439px) { .conn-status #connLabel { display: none; } .conn-status { width: 38px; padding: 0 !important; justify-content: center; border-radius: 50% !important; } .conn-status .conn-dot { margin: 0; } }
-@container tb (max-width: 329px) { .logo > span { display: none; } }
+/* TOPBAR */
+.topbar { background: var(--surface); border-bottom: 1px solid var(--border); box-shadow: var(--shadow); padding: 10px 20px; min-height: 64px; display: flex; align-items: center; justify-content: space-between; gap: 12px; position: sticky; top: 0; z-index: 100; }
+.logo { font-family: 'Syne', sans-serif; font-size: 20px; font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 8px; white-space: nowrap; min-width: 0; }
+.logo-img { width: 28px; height: 28px; object-fit: contain; flex: none; }
+.topbar-right { display: flex; align-items: center; gap: 10px; flex: none; }
+.tb-btn { height: 40px; padding: 0 16px; border-radius: 10px; border: 1px solid var(--border2); background: var(--surface2); color: var(--text); display: inline-flex; align-items: center; justify-content: center; gap: 9px; font: 500 14px 'DM Sans', sans-serif; text-decoration: none; cursor: pointer; white-space: nowrap; flex: none; transition: border-color .15s, background .15s; }
+.tb-btn:hover { border-color: var(--text3); }
+.tb-btn svg { width: 20px; height: 20px; flex: none; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.tb-btn.site svg { stroke: var(--amber); }
+.tb-btn.danger { color: var(--red,#e24b4a); border-color: var(--red,#e24b4a); background: transparent; }
+.tb-btn.theme { gap: 14px; padding: 0 14px; }
+.tb-btn.theme svg { width: 20px; height: 20px; opacity: .55; }
+.tb-btn.theme .i-sun { stroke: var(--text); }
+.tb-btn.theme .i-moon { stroke: var(--amber); fill: var(--amber); }
+:root:not([data-theme="dark"]) .tb-btn.theme .i-sun, [data-theme="dark"] .tb-btn.theme .i-moon { opacity: 1; }
+:root:not([data-theme="dark"]) .tb-btn.theme .i-sun { stroke: var(--amber); }
+:root:not([data-theme="dark"]) .tb-btn.theme .i-moon { fill: none; stroke: var(--text); }
+.conn-status { height: 40px !important; padding: 0 18px !important; border-radius: 10px !important; font-size: 14px !important; color: var(--text) !important; gap: 10px !important; }
+.conn-dot { width: 12px !important; height: 12px !important; margin: 0 !important; }
+#connLabel { max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 980px) { .tb-btn .tb-txt { display: none; } .tb-btn { padding: 0; width: 40px; } .tb-btn.theme { width: auto; padding: 0 10px; gap: 8px; } }
+@media (max-width: 560px) {
+  .topbar { padding: 8px 10px; gap: 8px; min-height: 56px; } .logo { font-size: 17px; } .topbar-right { gap: 6px; }
+  .tb-btn, .conn-status { height: 36px !important; } .tb-btn { width: 36px; } .tb-btn.theme { width: auto; padding: 0 8px; gap: 6px; } .tb-btn svg { width: 18px; height: 18px; }
+  .conn-status { padding: 0 !important; width: 36px; justify-content: center; } .conn-status #connLabel { display: none; }
+}
+@media (max-width: 400px) { .logo-txt { display: none; } .tb-btn.theme svg { width: 16px; height: 16px; } }
 
 /* LAYOUT */
 .layout { display: grid; grid-template-columns: 1fr 350px; max-width: 1160px; margin: 0 auto; padding: 22px 18px; gap: 20px; }
@@ -206,7 +207,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .conn-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text3); display: inline-block; margin-right: 5px; }
 .conn-dot.ok   { background: var(--green); box-shadow: 0 0 0 3px rgba(29,158,117,0.2); }
 .conn-dot.err  { background: var(--red); }
-.conn-status { height: 38px; padding: 0 14px; font: 600 13px 'DM Sans', sans-serif; color: var(--text); display: flex; align-items: center; gap: 3px; cursor: pointer; border-radius: 14px; border: 1px solid var(--border2); background: var(--surface2); flex-shrink: 0; white-space: nowrap; }
+.conn-status { font-size: 12px; color: var(--text2); display: flex; align-items: center; gap: 3px; cursor: pointer; padding: 4px 8px; border-radius: 6px; border: 1px solid var(--border2); background: var(--surface2); }
 .conn-status:hover { border-color: var(--green); }
 
 /* SERVER SETUP MODAL */
@@ -254,25 +255,16 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 </div>
 
 <header class="topbar">
-  <div class="tb-pill">
-    <button class="icon-btn menu-btn" id="menuBtn" onclick="toggleTbMenu(event)" aria-label="Open menu" aria-haspopup="true" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
-    <span class="tb-div" aria-hidden="true"></span>
-    <a class="logo" href="qg-admin-panel.html" aria-label="Quickgeo admin"><img src="submark-nav.png" onerror="this.onerror=null;this.src='submark-sm.png'" alt="" class="logo-img"><span>Quickgeo</span></a>
-    <div class="topbar-right">
-      <span class="admin-badge">⚙ ADMIN</span>
-      <span class="tb-div d2" aria-hidden="true"></span>
-      <button class="conn-status" id="connStatus" onclick="openServerModal()" title="Server connection settings" aria-label="Server connection settings">
-        <span class="conn-dot" id="connDot"></span>
-        <span id="connLabel">Not connected</span>
-      </button>
-      <button class="icon-btn" id="themeBtn" onclick="toggleTheme()" aria-label="Toggle dark/light mode" title="Toggle theme"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="i-moon" d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg><svg viewBox="0 0 24 24" aria-hidden="true"><g class="i-sun"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></g></svg></button>
-    </div>
-    <div class="tb-menu" id="tbMenu" role="menu">
-      <a href="index.html" target="_blank" rel="noopener" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg>View site</a>
-      <button onclick="logoutAllDevices()" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>Sign out all devices</button>
-      <hr>
-      <button class="danger" onclick="logout()" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v9M6.3 6.7a8 8 0 1 0 11.4 0"/></svg>Logout</button>
-    </div>
+  <div class="logo"><img src="submark-sm.png" onerror="this.onerror=null;this.src='submark.png'" alt="Quickgeo" class="logo-img"><span class="logo-txt">Quickgeo</span></div>
+  <div class="topbar-right">
+    <button class="conn-status" id="connStatus" onclick="openServerModal()" title="Server connection settings" aria-label="Server connection settings">
+      <span class="conn-dot" id="connDot"></span>
+      <span id="connLabel">Not connected</span>
+    </button>
+    <button class="tb-btn theme" id="themeBtn" onclick="toggleTheme()" aria-label="Toggle dark/light mode" title="Toggle theme"><svg viewBox="0 0 24 24" aria-hidden="true"><g class="i-sun"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></g></svg><svg viewBox="0 0 24 24" aria-hidden="true"><path class="i-moon" d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
+    <a href="index.html" class="tb-btn site" target="_blank" rel="noopener" title="View site" aria-label="View site"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg><span class="tb-txt">View Site</span></a>
+    <button class="tb-btn" onclick="logoutAllDevices()" title="Emergency: sign out all devices" aria-label="Sign out all devices"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="4" width="14" height="11" rx="1.5"/><path d="M3 9v9a1 1 0 0 0 1 1h6M10 19h4M14 15v4"/></svg><span class="tb-txt">All devices</span></button>
+    <button class="tb-btn danger" onclick="logout()" title="Logout" aria-label="Logout"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4M10 8l-4 4 4 4M6 12h10"/></svg><span class="tb-txt">Logout</span></button>
   </div>
 </header>
 
@@ -407,9 +399,6 @@ function applyTheme(t, save) {
   const btn = document.getElementById('themeBtn');
   if (save) localStorage.setItem('qg_theme', t);
 }
-function toggleTbMenu(e){ if(e) e.stopPropagation(); const m=document.getElementById('tbMenu'), b=document.getElementById('menuBtn'); const o=!m.classList.contains('open'); m.classList.toggle('open',o); b.setAttribute('aria-expanded',o); }
-document.addEventListener('click',e=>{ const m=document.getElementById('tbMenu'); if(m && !e.target.closest('#tbMenu')){ m.classList.remove('open'); const b=document.getElementById('menuBtn'); if(b) b.setAttribute('aria-expanded','false'); }});
-document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ const m=document.getElementById('tbMenu'); if(m) m.classList.remove('open'); }});
 function toggleTheme() { applyTheme(currentTheme === 'dark' ? 'light' : 'dark', true); }
 
 /* ── API LAYER (session token auth) ── */
