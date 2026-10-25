@@ -40,16 +40,31 @@ html { padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-are
 body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; transition: background 0.25s, color 0.25s; }
 
 /* TOPBAR */
-.topbar { background: var(--surface); border-bottom: 1px solid var(--border); box-shadow: var(--shadow); padding: 0 20px; height: 56px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
-.logo { font-family: 'Syne', sans-serif; font-size: 18px; font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 8px; }
-.logo-img { width: 28px; height: 28px; object-fit: contain; }
-.admin-badge { font-size: 11px; font-weight: 500; background: var(--amber-light); color: #856404; border: 1px solid var(--amber-border); border-radius: 20px; padding: 3px 10px; }
+.topbar { position: sticky; top: 0; z-index: 100; padding: 10px 12px 8px; background: linear-gradient(to bottom, var(--bg) 70%, transparent); pointer-events: none; }
+.tb-pill { pointer-events: auto; max-width: 1160px; margin: 0 auto; min-height: 52px; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 10px 6px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 999px; box-shadow: var(--shadow); }
+.logo { font-family: 'Syne', sans-serif; font-size: 18px; font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 8px; min-width: 0; white-space: nowrap; }
+.logo-img { width: 26px; height: 26px; object-fit: contain; flex: none; }
+.admin-badge { font-size: 11px; font-weight: 600; background: var(--amber-light); color: #856404; border: 1px solid var(--amber-border); border-radius: 20px; padding: 3px 10px; white-space: nowrap; }
 [data-theme="dark"] .admin-badge { color: var(--amber); }
-.topbar-right { display: flex; align-items: center; gap: 8px; }
-.icon-btn { width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--border2); background: var(--surface2); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 14px; }
-.icon-btn:hover { background: var(--border2); }
-.user-link { font-size: 13px; color: var(--green); text-decoration: none; border: 1px solid var(--green); border-radius: 8px; padding: 5px 12px; font-weight: 500; }
-.user-link:hover { background: var(--green-light); }
+.topbar-right { display: flex; align-items: center; gap: 6px; min-width: 0; flex: none; }
+.tb-btn { height: 34px; min-width: 34px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--border2); background: var(--surface2); color: var(--text2); display: inline-flex; align-items: center; justify-content: center; gap: 6px; font: 500 13px 'DM Sans', sans-serif; text-decoration: none; cursor: pointer; white-space: nowrap; flex: none; }
+.tb-btn svg { width: 16px; height: 16px; flex: none; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.tb-btn:hover { border-color: var(--green); color: var(--text); }
+.tb-btn.danger { color: var(--red,#e24b4a); border-color: color-mix(in srgb, var(--red,#e24b4a) 55%, transparent); background: none; }
+.tb-btn.icon { padding: 0; width: 34px; }
+.tb-sep { width: 1px; height: 20px; background: var(--border2); margin: 0 2px; flex: none; }
+.icon-btn { width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--border2); background: var(--surface2); color: var(--text2); cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; flex: none; }
+.icon-btn svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.icon-btn:hover { border-color: var(--green); }
+#themeBtn .i-sun { display: none; } [data-theme="dark"] #themeBtn .i-sun { display: block; } [data-theme="dark"] #themeBtn .i-moon { display: none; }
+#connLabel { max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 900px) { .tb-btn .tb-txt { display: none; } .tb-btn { padding: 0; width: 34px; } .admin-badge { display: none; } }
+@media (max-width: 560px) {
+  .topbar { padding: 8px 8px 6px; } .tb-pill { padding: 5px 8px 5px 12px; gap: 6px; } .logo { font-size: 16px; }
+  .conn-status { padding: 0 !important; width: 34px; height: 34px; justify-content: center; border-radius: 50% !important; } .conn-status #connLabel { display: none; } .conn-status .conn-dot { margin: 0; }
+  .tb-sep { display: none; } .topbar-right { gap: 5px; }
+}
+@media (max-width: 360px) { .logo-txt { display: none; } }
 
 /* LAYOUT */
 .layout { display: grid; grid-template-columns: 1fr 350px; max-width: 1160px; margin: 0 auto; padding: 22px 18px; gap: 20px; }
@@ -191,7 +206,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .conn-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text3); display: inline-block; margin-right: 5px; }
 .conn-dot.ok   { background: var(--green); box-shadow: 0 0 0 3px rgba(29,158,117,0.2); }
 .conn-dot.err  { background: var(--red); }
-.conn-status { font-size: 12px; color: var(--text2); display: flex; align-items: center; gap: 3px; cursor: pointer; padding: 4px 8px; border-radius: 6px; border: 1px solid var(--border2); background: var(--surface2); }
+.conn-status { height: 34px; border-radius: 999px !important; padding: 0 12px !important; font-size: 12px; flex: none; color: var(--text2); display: flex; align-items: center; gap: 3px; cursor: pointer; padding: 4px 8px; border-radius: 6px; border: 1px solid var(--border2); background: var(--surface2); }
 .conn-status:hover { border-color: var(--green); }
 
 /* SERVER SETUP MODAL */
@@ -239,17 +254,19 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 </div>
 
 <header class="topbar">
-  <div class="logo"><img src="submark-sm.png" onerror="this.onerror=null;this.src='submark.png'" alt="Quickgeo" class="logo-img"> Quickgeo</div>
-  <div class="topbar-right">
-    <span class="admin-badge">⚙ Admin</span>
-    <button class="conn-status" id="connStatus" onclick="openServerModal()" title="Server connection settings">
-      <span class="conn-dot" id="connDot"></span>
-      <span id="connLabel">Not connected</span>
-    </button>
-    <button class="icon-btn" id="themeBtn" onclick="toggleTheme()" aria-label="Toggle dark/light mode">🌙</button>
-    <a href="index.html" class="user-link" target="_blank" rel="noopener">↗ View Site</a>
-    <button class="user-link" onclick="logoutAllDevices()" title="Emergency: sign out all devices" style="cursor:pointer;background:none;color:var(--text3);border-color:var(--border);font-size:11px">🔒 All devices</button>
-    <button class="user-link" onclick="logout()" style="cursor:pointer;background:none;color:var(--red,#e24b4a);border-color:var(--red,#e24b4a)">⏻ Logout</button>
+  <div class="tb-pill">
+    <div class="logo"><img src="submark-sm.png" onerror="this.onerror=null;this.src='submark.png'" alt="Quickgeo" class="logo-img"><span class="logo-txt">Quickgeo</span><span class="admin-badge">⚙ Admin</span></div>
+    <div class="topbar-right">
+      <button class="conn-status" id="connStatus" onclick="openServerModal()" title="Server connection settings" aria-label="Server connection settings">
+        <span class="conn-dot" id="connDot"></span>
+        <span id="connLabel">Not connected</span>
+      </button>
+      <button class="icon-btn" id="themeBtn" onclick="toggleTheme()" aria-label="Toggle dark/light mode" title="Toggle theme"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="i-moon" d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg><svg viewBox="0 0 24 24" aria-hidden="true"><g class="i-sun"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></g></svg></button>
+      <span class="tb-sep"></span>
+      <a href="index.html" class="tb-btn" target="_blank" rel="noopener" title="View site" aria-label="View site"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg><span class="tb-txt">View Site</span></a>
+      <button class="tb-btn" onclick="logoutAllDevices()" title="Emergency: sign out all devices" aria-label="Sign out all devices"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg><span class="tb-txt">All devices</span></button>
+      <button class="tb-btn danger" onclick="logout()" title="Logout" aria-label="Logout"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v9M6.3 6.7a8 8 0 1 0 11.4 0"/></svg><span class="tb-txt">Logout</span></button>
+    </div>
   </div>
 </header>
 
@@ -382,7 +399,6 @@ function applyTheme(t, save) {
   currentTheme = t;
   document.documentElement.setAttribute('data-theme', t);
   const btn = document.getElementById('themeBtn');
-  if (btn) btn.textContent = t === 'dark' ? '☀️' : '🌙';
   if (save) localStorage.setItem('qg_theme', t);
 }
 function toggleTheme() { applyTheme(currentTheme === 'dark' ? 'light' : 'dark', true); }
