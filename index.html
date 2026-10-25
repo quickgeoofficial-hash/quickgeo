@@ -161,13 +161,15 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 /* ── PAGE LAYOUT: ads fixed, only center scrolls ── */
 .page-body { display: flex; flex: 1; overflow: hidden; }
 
-/* Ad columns — full height, never scroll */
-.ad-col { width: 160px; flex-shrink: 0; background: var(--surface); display: flex; flex-direction: column; overflow: hidden; }
+/* Ad columns — as tall as the feed; ads are stacked down the whole column (see fillSideColumns) */
+.ad-col { width: 160px; flex-shrink: 0; background: var(--surface); position: relative; overflow: hidden; }
 .ad-col.left { border-right: 1px solid var(--border); }
 .ad-col.right { border-left: 1px solid var(--border); }
-/* Each slot fills equal height */
-.ad-slot { flex: 1; display: flex; align-items: center; justify-content: center; border-bottom: 1px solid var(--border); padding: 10px 8px; }
-.ad-slot:last-child { border-bottom: none; }
+/* The stack is absolutely positioned so the ads can never make the column (and therefore the page) taller */
+.ad-fill { position: absolute; inset: 0; overflow: hidden; display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 10px 0; }
+.side-slot { flex: none; width: 160px; display: flex; flex-direction: column; align-items: center; }
+.side-slot .ad-label { height: 14px; line-height: 14px; padding: 0; }
+.side-slot iframe { display: block; border: 0; }
 /* AdSense placeholder — replace .ad-placeholder with real <ins> tag in production */
 .ad-placeholder { width: 100%; height: 100%; min-height: 120px; background: var(--surface2); border-radius: 8px; border: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; overflow: hidden; }
 .ad-placeholder ins { display: block; width: 100%; }
@@ -371,8 +373,9 @@ footer span { font-size: 12px; color: var(--text3); }
 .sm-footer { padding: 14px 18px; font-size: 11px; color: var(--text3); border-top: 1px solid var(--border); }
 
 /* ── RESPONSIVE ── */
-@media (max-width: 900px) { .ad-col { width: 120px; } }
-@media (max-width: 700px) { .ad-col { display: none; } .cat-search:focus, .cat-search.has-val { width: 120px; } }
+@media (max-width: 900px) { .ad-col { display: none; }
+  .cat-search:focus, .cat-search.has-val { width: 120px; } }
+@media (max-width: 700px) { .cat-search:focus, .cat-search.has-val { width: 120px; } }
 </style>
 </head>
 <body>
@@ -467,10 +470,7 @@ footer span { font-size: 12px; color: var(--text3); }
 <div class="page-body">
 
   <!-- LEFT AD — populated by JS (adsterraSlots) with sandboxed iframes -->
-  <aside class="ad-col left" aria-label="Advertisement">
-    <div class="ad-slot"><div class="ad-placeholder" id="adLeftTop"><div class="ad-label">Advertisement</div></div></div>
-    <div class="ad-slot"><div class="ad-placeholder" id="adLeftBottom"><div class="ad-label">Advertisement</div></div></div>
-  </aside>
+  <aside class="ad-col left" aria-label="Advertisement"><div class="ad-fill" data-side="left"></div></aside>
 
   <!-- SCROLLABLE FEED -->
   <main class="feed-col" id="feedCol">
@@ -503,10 +503,7 @@ footer span { font-size: 12px; color: var(--text3); }
   </main>
 
   <!-- RIGHT AD — populated by JS (adsterraSlots) with sandboxed iframes -->
-  <aside class="ad-col right" aria-label="Advertisement">
-    <div class="ad-slot"><div class="ad-placeholder" id="adRightTop"><div class="ad-label">Advertisement</div></div></div>
-    <div class="ad-slot"><div class="ad-placeholder" id="adRightBottom"><div class="ad-label">Advertisement</div></div></div>
-  </aside>
+  <aside class="ad-col right" aria-label="Advertisement"><div class="ad-fill" data-side="right"></div></aside>
 
 </div>
 
@@ -1979,22 +1976,84 @@ showSkeletons(3);
 
 /* ── Populate static Banner ad slots (sidebar + top) — each isolated in its own sandboxed iframe ── */
 function populateAdsterraSlots() {
+  // Top-of-feed banners (one per breakpoint). Side columns are handled by fillSideColumns().
   const slots = [
-    { id: 'adLeftTop',     key: ADSTERRA_KEYS.w160h600, w: 160, h: 600 },
-    { id: 'adLeftBottom',  key: ADSTERRA_KEYS.w160h300, w: 160, h: 300 },
-    { id: 'adRightTop',    key: ADSTERRA_KEYS.w160h600, w: 160, h: 600 },
-    { id: 'adRightBottom', key: ADSTERRA_KEYS.w160h300, w: 160, h: 300 },
     { id: 'adTopDesktop',  key: ADSTERRA_KEYS.w728h90,  w: 728, h: 90  },
     { id: 'adTopMobile',   key: ADSTERRA_KEYS.w468h60,  w: 468, h: 60  },
   ];
   slots.forEach(slot => {
     const el = document.getElementById(slot.id);
     if (!el) return;
-    if (!el.offsetParent) return; // slot is hidden by CSS (wrong breakpoint / sidebar on mobile) — don't load an ad nobody can see
+    if (!el.offsetParent) return; // slot is hidden by CSS (wrong breakpoint) — don't load an ad nobody can see
     el.appendChild(createAdsterraBannerIframe(slot.key, slot.w, slot.h));
   });
 }
 populateAdsterraSlots();
+
+/* ── SIDE COLUMNS: stack ads down the ENTIRE height of the left and right columns ──
+   Layout per column: 160x600 banners back to back; if the leftover space is big enough, a final 160x300.
+   The column is as tall as the feed, and the feed keeps growing (infinite scroll), so this re-runs whenever the
+   column's size changes. Each slot is an empty placeholder until it is within ~600px of the viewport, and only
+   then loads its ad — ads far down the page don't load (or count as impressions) until someone gets near them. */
+const SIDE_GAP = 12, SIDE_LABEL = 14, SIDE_PAD = 10, SIDE_MAX_PER_COL = 30;
+const sideAdObserver = ('IntersectionObserver' in window)
+  ? new IntersectionObserver(entries => entries.forEach(en => {
+      if (en.isIntersecting) { sideAdObserver.unobserve(en.target); loadSideSlot(en.target); }
+    }), { rootMargin: '600px 0px' })
+  : null;
+
+function loadSideSlot(slot) {
+  if (slot.dataset.loaded) return;
+  slot.dataset.loaded = '1';
+  const h = Number(slot.dataset.h);
+  slot.appendChild(createAdsterraBannerIframe(h === 600 ? ADSTERRA_KEYS.w160h600 : ADSTERRA_KEYS.w160h300, 160, h));
+}
+function sideSequence(totalH) {
+  const seq = [];
+  let y = SIDE_PAD;
+  while (seq.length < SIDE_MAX_PER_COL) {
+    const room = totalH - y - SIDE_PAD;
+    if (room >= 600 + SIDE_LABEL)      { seq.push(600); y += 600 + SIDE_LABEL + SIDE_GAP; }
+    else if (room >= 300 + SIDE_LABEL) { seq.push(300); y += 300 + SIDE_LABEL + SIDE_GAP; }
+    else break;
+  }
+  return seq;
+}
+function makeSideSlot(h) {
+  const slot = document.createElement('div');
+  slot.className = 'side-slot';
+  slot.dataset.h = String(h);
+  slot.style.height = (h + SIDE_LABEL) + 'px';
+  const label = document.createElement('div');
+  label.className = 'ad-label';
+  label.textContent = 'Advertisement';
+  slot.appendChild(label);
+  if (sideAdObserver) sideAdObserver.observe(slot); else loadSideSlot(slot);
+  return slot;
+}
+function fillSideColumn(col) {
+  const box = col.querySelector('.ad-fill');
+  if (!box) return;
+  if (!col.offsetParent) return;                       // hidden at this screen size
+  const seq = sideSequence(col.clientHeight);
+  const slots = [...box.children];
+  // keep the matching prefix, replace the first slot whose size changed, add / drop the rest
+  let i = 0;
+  while (i < seq.length && i < slots.length && Number(slots[i].dataset.h) === seq[i]) i++;
+  slots.slice(i).forEach(sl => { if (sideAdObserver) sideAdObserver.unobserve(sl); sl.remove(); });
+  for (; i < seq.length; i++) box.appendChild(makeSideSlot(seq[i]));
+}
+function fillSideColumns() { document.querySelectorAll('.ad-col').forEach(fillSideColumn); }
+(function watchSideColumns() {
+  let raf = 0;
+  const schedule = () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(fillSideColumns); };
+  if ('ResizeObserver' in window) {
+    const ro = new ResizeObserver(schedule);
+    document.querySelectorAll('.ad-col').forEach(c => ro.observe(c));
+  }
+  window.addEventListener('resize', schedule);
+  schedule();
+})();
 
 // Initial load then connect SSE for real-time updates
 loadPosts().then(async () => {
