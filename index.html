@@ -136,6 +136,15 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 /* "Install" (Add to Home Screen). JS shows it with an inline display; on narrow bars it moves into the ☰ menu instead. */
 .install-btn { display: none; align-items: center; gap: 6px; height: 38px; padding: 0 12px; border-radius: 14px; border: 1px solid var(--green); background: color-mix(in srgb, var(--green) 12%, transparent); color: var(--green); font: 600 13px 'DM Sans', sans-serif; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
 
+@container tb (min-width: 740px) {
+  .topbar-pill { height: 66px; padding: 0 12px; gap: 14px; border-radius: 26px; }
+  .logo { font-size: 25px; gap: 12px; }
+  .logo-img { height: 46px; max-width: 38px; }
+  .icon-btn { width: 44px; height: 44px; } .menu-btn { border-radius: 14px; }
+  .lang-btn { height: 44px; font-size: 15px; padding: 0 14px; }
+  .live-badge { font-size: 13px; padding: 8px 14px; box-shadow: 0 0 18px color-mix(in srgb, var(--red-text) 18%, transparent); }
+  .topbar-right { gap: 10px; } .tb-div { height: 30px; }
+}
 @container tb (max-width: 599px) {
   .tb-div { display: none; }
   .topbar-pill { gap: 8px; }
