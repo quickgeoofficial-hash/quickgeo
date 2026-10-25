@@ -604,6 +604,42 @@ function handleClipboardPaste(e) {
   // If no image/video in clipboard, let default paste behavior continue (pastes text normally)
 }
 
+/* ── Video poster: grab a still frame in the browser so link previews (WhatsApp/Telegram/X) show a thumbnail ──
+   Kept small (<~250 KB) because WhatsApp drops large preview images. Failure is non-fatal. ── */
+async function makeVideoPoster(file) {
+  const url = URL.createObjectURL(file);
+  try {
+    const v = document.createElement('video');
+    v.muted = true; v.playsInline = true; v.preload = 'auto'; v.src = url;
+    await new Promise((res, rej) => { v.onloadeddata = res; v.onerror = () => rej(new Error('cannot decode video')); setTimeout(() => rej(new Error('timeout')), 15000); });
+    const t = Math.min(1, (v.duration || 2) * 0.1);
+    await new Promise((res, rej) => { v.onseeked = res; v.onerror = () => rej(new Error('seek failed')); v.currentTime = t; setTimeout(res, 4000); });
+    const vw = v.videoWidth, vh = v.videoHeight;
+    if (!vw || !vh) throw new Error('no frame');
+    for (const maxW of [1200, 900, 640]) {
+      const sc = Math.min(1, maxW / vw), c = document.createElement('canvas');
+      c.width = Math.round(vw * sc); c.height = Math.round(vh * sc);
+      c.getContext('2d').drawImage(v, 0, 0, c.width, c.height);
+      for (const q of [0.8, 0.65, 0.5]) {
+        const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', q));
+        if (blob && blob.size < 250 * 1024) return blob;
+      }
+    }
+    return null;
+  } finally { URL.revokeObjectURL(url); }
+}
+function uploadBlob(blob, name) {
+  return new Promise((resolve, reject) => {
+    const fd = new FormData(); fd.append('file', blob, name);
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', API.base() + '/api/upload');
+    xhr.setRequestHeader('Authorization', `Bearer ${API.token()}`);
+    xhr.onload = () => (xhr.status === 200 || xhr.status === 201) ? resolve(JSON.parse(xhr.responseText)) : reject(new Error('poster upload ' + xhr.status));
+    xhr.onerror = () => reject(new Error('poster upload network error'));
+    xhr.send(fd);
+  });
+}
+
 /* ── P8: Upload file to server, get back a URL ── */
 async function handleFiles(files) {
   for (const file of Array.from(files)) {
@@ -646,6 +682,12 @@ async function handleFiles(files) {
 
       // Store the server URL (not base64!)
       uploadedFiles[idx] = { url: result.url, type: result.type, filename: result.filename };
+      if (result.type.startsWith('video')) {
+        try {
+          const pb = await makeVideoPoster(file);
+          if (pb) { const pr = await uploadBlob(pb, 'poster.jpg'); uploadedFiles[idx].poster = pr.url; }
+        } catch (pe) { console.warn('Poster skipped:', pe.message); showToast('ℹ️ Video uploaded without a link-preview thumbnail', 'err'); }
+      }
 
       // Replace placeholder with actual preview — validate URL first
       const safeUrl = safeMediaUrl(result.url);
@@ -804,7 +846,7 @@ async function publishPost() {
 
   const media = [];
   if (activeTab === 'image') {
-    uploadedFiles.filter(Boolean).forEach(f => media.push({ url: f.url, type: f.type || '' }));
+    uploadedFiles.filter(Boolean).forEach(f => media.push(f.poster ? { url: f.url, type: f.type || '', poster: f.poster } : { url: f.url, type: f.type || '' }));
   } else if (activeTab === 'gif' && selectedGif) {
     media.push({ url: selectedGif, type: 'gif' });
   }
