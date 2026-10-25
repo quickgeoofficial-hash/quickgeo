@@ -67,6 +67,9 @@ function createSession(){db.prepare('DELETE FROM sessions WHERE expires < ?').ru
 function isValidSession(t){if(!t)return false;const r=db.prepare('SELECT expires FROM sessions WHERE token=?').get(t);if(!r)return false;if(r.expires<Date.now()){db.prepare('DELETE FROM sessions WHERE token=?').run(t);return false;}return true;}
 const storage=multer.diskStorage({destination:(req,file,cb)=>cb(null,UPLOADS_DIR),filename:(req,file,cb)=>{const ext=path.extname(file.originalname).toLowerCase();cb(null,`${Date.now()}-${crypto.randomBytes(6).toString('hex')}${ext}`);}});
 const upload=multer({storage,limits:{fileSize:50*1024*1024},fileFilter(req,file,cb){if(/image\/(jpeg|png|gif|webp)|video\/(mp4|webm|quicktime)/.test(file.mimetype))cb(null,true);else cb(new Error('File type not allowed'));}});
+// Only keep known fields, and only http(s) URLs (poster = still frame for video link previews)
+function cleanMedia(m){if(!Array.isArray(m))return[];const ok=u=>typeof u==='string'&&/^https?:\/\//.test(u)&&u.length<1000;
+  return m.filter(x=>x&&ok(x.url)).slice(0,10).map(x=>{const o={url:x.url,type:String(x.type||'').slice(0,40)};if(ok(x.poster))o.poster=x.poster;return o;});}
 function delFile(url){if(!url||url.startsWith('data:'))return;try{const fn=url.split('/uploads/').pop();if(fn){const fp=path.join(UPLOADS_DIR,fn);if(fs.existsSync(fp))fs.unlinkSync(fp);}}catch{}}
 
 /* ── MAGIC-BYTE VERIFICATION ──
@@ -346,10 +349,10 @@ app.post('/api/posts',adminOnly,(req,res)=>{
   if(tooLong(text,LIMITS.text))return res.status(400).json({error:`text too long (max ${LIMITS.text} chars)`});
   let sRT=null;if(replyTo&&typeof replyTo==='object'){const rid=Number(replyTo.id);if(rid)sRT={id:rid,text:String(replyTo.text||'').slice(0,LIMITS.replyText),tag:String(replyTo.tag||'').slice(0,LIMITS.tag),tagEmoji:String(replyTo.tagEmoji||'').slice(0,LIMITS.tagEmoji)};}
   const now=new Date(),id=Date.now();
-  db.prepare("INSERT INTO posts(id,tag,tagEmoji,text,media,replyTo,reactions,reactUsers,pinned,time,date,createdAt) VALUES(?,?,?,?,?,?,'{}','{}',0,?,?,?)").run(id,tag,tagEmoji||'',text||'',JSON.stringify(Array.isArray(media)?media:[]),sRT?JSON.stringify(sRT):null,now.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}),now.toLocaleDateString(),now.toISOString());
+  db.prepare("INSERT INTO posts(id,tag,tagEmoji,text,media,replyTo,reactions,reactUsers,pinned,time,date,createdAt) VALUES(?,?,?,?,?,?,'{}','{}',0,?,?,?)").run(id,tag,tagEmoji||'',text||'',JSON.stringify(cleanMedia(media)),sRT?JSON.stringify(sRT):null,now.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}),now.toLocaleDateString(),now.toISOString());
   broadcast({type:'new_post',id});const post=parsePost(db.prepare('SELECT * FROM posts WHERE id=?').get(id));const{reactUsers,...safe}=post;res.status(201).json(safe);
 });
-app.delete('/api/posts/:id',adminOnly,(req,res)=>{const id=Number(req.params.id),row=db.prepare('SELECT media FROM posts WHERE id=?').get(id);if(!row)return res.status(404).json({error:'Post not found'});try{JSON.parse(row.media||'[]').forEach(m=>delFile(m.url));}catch{}db.prepare('DELETE FROM posts WHERE id=?').run(id);broadcast({type:'delete_post',id});res.json({ok:true});});
+app.delete('/api/posts/:id',adminOnly,(req,res)=>{const id=Number(req.params.id),row=db.prepare('SELECT media FROM posts WHERE id=?').get(id);if(!row)return res.status(404).json({error:'Post not found'});try{JSON.parse(row.media||'[]').forEach(m=>{delFile(m.url);delFile(m.poster);});}catch{}db.prepare('DELETE FROM posts WHERE id=?').run(id);broadcast({type:'delete_post',id});res.json({ok:true});});
 app.patch('/api/posts/:id/edit',adminOnly,(req,res)=>{
   const id=Number(req.params.id);
   if(!db.prepare('SELECT id FROM posts WHERE id=?').get(id))return res.status(404).json({error:'Post not found'});
