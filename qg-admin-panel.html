@@ -67,6 +67,17 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 }
 @media (max-width: 400px) { .logo-txt { display: none; } .tb-btn.theme svg { width: 16px; height: 16px; } }
 
+.feed-search { position: relative; margin: 0 0 12px; }
+.feed-search svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 16px; height: 16px; stroke: var(--text3); fill: none; stroke-width: 2; stroke-linecap: round; pointer-events: none; }
+.feed-search input { width: 100%; height: 40px; padding: 0 38px 0 36px; border-radius: 10px; border: 1px solid var(--border2); background: var(--surface); color: var(--text); font: 400 14px 'DM Sans', sans-serif; outline: none; }
+.feed-search input::-webkit-search-cancel-button, .feed-search input::-webkit-search-decoration { -webkit-appearance: none; appearance: none; display: none; }
+.feed-search input:focus { border-color: var(--green); }
+.feed-search .fs-clear { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); width: 28px; height: 28px; border: 0; border-radius: 50%; background: none; color: var(--text3); font-size: 18px; line-height: 1; cursor: pointer; display: none; }
+.feed-search.has-q .fs-clear { display: block; } .feed-search .fs-clear:hover { background: var(--surface2); color: var(--text); }
+.fs-status { font-size: 12px; color: var(--text3); margin: -6px 2px 10px; display: none; } .fs-status.on { display: block; }
+.pcard.fs-hide { display: none; }
+mark.fs-hit { background: color-mix(in srgb, var(--amber) 45%, transparent); color: inherit; border-radius: 3px; padding: 0 1px; }
+
 /* LAYOUT */
 .layout { display: grid; grid-template-columns: 1fr 350px; max-width: 1160px; margin: 0 auto; padding: 22px 18px; gap: 20px; }
 
@@ -376,6 +387,12 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
       <h3>Published Posts</h3>
       <span class="post-count" id="postCount">0 posts</span>
     </div>
+    <div class="feed-search" id="feedSearch">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <input type="search" id="feedSearchInput" placeholder="Search posts — text, tag, date…" autocomplete="off" aria-label="Search posts" enterkeyhint="search">
+      <button type="button" class="fs-clear" id="feedSearchClear" aria-label="Clear search">×</button>
+    </div>
+    <div class="fs-status" id="feedSearchStatus" role="status"></div>
     <div id="adminFeed">
       <div class="empty-msg">No posts yet. Publish your first update!</div>
     </div>
@@ -1108,10 +1125,73 @@ async function renderAdminFeed() {
     feed.innerHTML = '';
     _cachedPosts.forEach(post => feed.appendChild(createAdminPostCardElement(post)));
     renderAdminLoadMoreButton(feed);
+    if (_fsQuery.trim()) { applyAdminSearch(); _fsLoadEverything(); }
   } catch (e) {
     feed.innerHTML = `<div class="empty-msg" style="color:var(--red)">⚠ Could not load posts.<br><small>${escapeHtml(e.message)}</small></div>`;
   }
 }
+
+
+/* ── SEARCH / FILTER POSTS ── */
+let _fsQuery = '', _fsLoading = false;
+function _fsNorm(t){ return String(t||'').toLowerCase(); }
+function _fsMatches(post, terms){
+  const hay = _fsNorm([post.text, post.tag, post.tagEmoji, post.date, post.time, (post.media||[]).map(m=>m.type).join(' ')].join(' '));
+  return terms.every(t => hay.includes(t));
+}
+function _fsClearMarks(el){ el.querySelectorAll('mark.fs-hit').forEach(m => m.replaceWith(document.createTextNode(m.textContent))); el.normalize(); }
+function _fsMark(el, terms){
+  const w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT), nodes = [];
+  while (w.nextNode()) nodes.push(w.currentNode);
+  const re = new RegExp('(' + terms.map(t => t.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('|') + ')', 'gi');
+  nodes.forEach(n => {
+    if (!re.test(n.nodeValue)) { re.lastIndex = 0; return; }
+    re.lastIndex = 0;
+    const span = document.createElement('span');
+    span.innerHTML = escapeHtml(n.nodeValue).replace(new RegExp('(' + terms.map(t => escapeHtml(t).replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('|') + ')', 'gi'), '<mark class="fs-hit">$1</mark>');
+    n.replaceWith(...span.childNodes);
+  });
+}
+function applyAdminSearch(){
+  const feed = document.getElementById('adminFeed'), st = document.getElementById('feedSearchStatus');
+  const terms = _fsNorm(_fsQuery).split(/\s+/).filter(Boolean);
+  document.getElementById('feedSearch').classList.toggle('has-q', !!_fsQuery);
+  feed.querySelectorAll('.fs-none').forEach(n => n.remove());
+  let shown = 0;
+  const byId = new Map((_cachedPosts||[]).map(p => [String(p.id), p]));
+  feed.querySelectorAll('.pcard').forEach(card => {
+    const post = byId.get(card.id.replace('post-',''));
+    _fsClearMarks(card.querySelector('.pbody') || card);
+    const ok = !terms.length || (post && _fsMatches(post, terms));
+    card.classList.toggle('fs-hide', !ok);
+    if (ok) { shown++; if (terms.length) { const b = card.querySelector('.pbody'); if (b) _fsMark(b, terms); } }
+  });
+  if (terms.length && !shown && !_fsLoading) {
+    const d = document.createElement('div'); d.className = 'empty-msg fs-none';
+    d.textContent = 'No posts match “' + _fsQuery.trim() + '”.'; feed.insertBefore(d, feed.firstChild);
+  }
+  const total = (_cachedPosts||[]).length;
+  st.classList.toggle('on', !!terms.length);
+  st.textContent = terms.length ? (shown + ' of ' + total + ' loaded post' + (total !== 1 ? 's' : '') + ' match' + (shown === 1 ? 'es' : '') + (_fsLoading ? ' · searching older posts…' : '')) : '';
+}
+async function _fsLoadEverything(){
+  if (_fsLoading) return;
+  _fsLoading = true;
+  try {
+    for (let i = 0; i < 40 && _fsQuery.trim() && _adminHasMore && API.isOk(); i++) {
+      if (_adminLoadMoreLock) { await new Promise(r => setTimeout(r, 150)); continue; }
+      await loadMoreAdminPosts();
+      applyAdminSearch();
+    }
+  } finally { _fsLoading = false; applyAdminSearch(); }
+}
+(function(){
+  const inp = document.getElementById('feedSearchInput'), clr = document.getElementById('feedSearchClear');
+  let t = null;
+  inp.addEventListener('input', () => { _fsQuery = inp.value; clearTimeout(t); t = setTimeout(() => { applyAdminSearch(); if (_fsQuery.trim()) _fsLoadEverything(); }, 160); });
+  inp.addEventListener('keydown', e => { if (e.key === 'Escape') clr.click(); });
+  clr.addEventListener('click', () => { inp.value = ''; _fsQuery = ''; applyAdminSearch(); inp.focus(); });
+})();
 
 /* ════════════════════════════
    NOTIFY — admin-triggered push (never automatic)
