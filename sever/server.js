@@ -32,6 +32,7 @@ CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires);
 CREATE INDEX IF NOT EXISTS idx_posts_tag ON posts(tag);
 CREATE INDEX IF NOT EXISTS idx_posts_id_pinned0 ON posts(id DESC) WHERE pinned = 0;
 `);
+try{if(!db.prepare('PRAGMA table_info(posts)').all().some(c=>c.name==='links'))db.exec("ALTER TABLE posts ADD COLUMN links TEXT DEFAULT '[]'");}catch(e){console.warn('links column migration:',e.message);}
 const DEFAULT_CATS=[{emoji:'🔴',name:'Breaking'},{emoji:'🗺',name:'Maps'},{emoji:'🛰',name:'Satellite'},{emoji:'🌐',name:'OSM'},{emoji:'📊',name:'Data'},{emoji:'✨',name:'Feature'},{emoji:'🔄',name:'Update'}];
 if(db.prepare('SELECT COUNT(*) as n FROM categories').get().n===0){const ins=db.prepare('INSERT OR IGNORE INTO categories (emoji,name) VALUES (?,?)');DEFAULT_CATS.forEach(c=>ins.run(c.emoji,c.name));console.log('✅  Default categories seeded');}
 (function migrate(){
@@ -40,7 +41,7 @@ if(db.prepare('SELECT COUNT(*) as n FROM categories').get().n===0){const ins=db.
   if(fs.existsSync(cf)){try{const cats=JSON.parse(fs.readFileSync(cf,'utf8'));const ins=db.prepare('INSERT OR IGNORE INTO categories(emoji,name) VALUES(?,?)');cats.forEach(c=>ins.run(c.emoji||'📌',c.name));fs.renameSync(cf,cf+'.migrated');console.log('✅  Migrated categories');}catch(e){console.warn('⚠️  categories.json migration:',e.message);}}
 })();
 const push=require('./push');push.migrate(db); // admin-triggered Web Push: adds posts.notifiedAt + push_subscriptions table
-function parsePost(r){return{...r,media:JSON.parse(r.media||'[]'),replyTo:r.replyTo?JSON.parse(r.replyTo):null,reactions:JSON.parse(r.reactions||'{}'),reactUsers:JSON.parse(r.reactUsers||'{}'),pinned:!!r.pinned};}
+function parsePost(r){let links=[];try{links=JSON.parse(r.links||'[]');}catch{}return{...r,links,media:JSON.parse(r.media||'[]'),replyTo:r.replyTo?JSON.parse(r.replyTo):null,reactions:JSON.parse(r.reactions||'{}'),reactUsers:JSON.parse(r.reactUsers||'{}'),pinned:!!r.pinned};}
 const stmtPinned=db.prepare('SELECT * FROM posts WHERE pinned = 1 ORDER BY id DESC');
 const getPinnedPosts=()=>stmtPinned.all().map(parsePost);
 /* Paginated, filterable fetch of NON-pinned posts — this is what scales to lakhs of rows.
@@ -68,6 +69,14 @@ function isValidSession(t){if(!t)return false;const r=db.prepare('SELECT expires
 const storage=multer.diskStorage({destination:(req,file,cb)=>cb(null,UPLOADS_DIR),filename:(req,file,cb)=>{const ext=path.extname(file.originalname).toLowerCase();cb(null,`${Date.now()}-${crypto.randomBytes(6).toString('hex')}${ext}`);}});
 const upload=multer({storage,limits:{fileSize:50*1024*1024},fileFilter(req,file,cb){if(/image\/(jpeg|png|gif|webp)|video\/(mp4|webm|quicktime)/.test(file.mimetype))cb(null,true);else cb(new Error('File type not allowed'));}});
 // Only keep known fields, and only http(s) URLs (poster = still frame for video link previews)
+/* ── Inline links: [{start,end,url}] — offsets are UTF-16 indexes into post text (same as JS .length) ── */
+function safeLinkUrl(raw){if(typeof raw!=='string')return null;let u=raw.trim();if(!u||u.length>2000||/[\s\u0000-\u001f\u007f<>"'`\\]/.test(u))return null;
+  if(!/^[a-z][a-z0-9+.-]*:/i.test(u)&&/^(www\.)?[a-z0-9-]+(\.[a-z0-9-]+)+([\/?#:]|$)/i.test(u))u='https://'+u;
+  let p;try{p=new URL(u);}catch{return null;}
+  if(p.protocol!=='http:'&&p.protocol!=='https:')return null;if(p.username||p.password)return null;if(!p.hostname.includes('.'))return null;return p.href;}
+function cleanLinks(links,text){if(!Array.isArray(links))return[];const len=String(text||'').length,out=[];
+  for(const l of links.slice(0,50)){if(!l||typeof l!=='object')continue;const s=Number(l.start),e=Number(l.end);if(!Number.isInteger(s)||!Number.isInteger(e)||s<0||e<=s||e>len)continue;const url=safeLinkUrl(l.url);if(!url)continue;out.push({start:s,end:e,url});}
+  out.sort((a,b)=>a.start-b.start);const res=[];let last=0;for(const l of out){if(l.start<last)continue;res.push(l);last=l.end;}return res;}
 function cleanMedia(m){if(!Array.isArray(m))return[];const ok=u=>typeof u==='string'&&/^https?:\/\//.test(u)&&u.length<1000;
   return m.filter(x=>x&&ok(x.url)).slice(0,10).map(x=>{const o={url:x.url,type:String(x.type||'').slice(0,40)};if(ok(x.poster))o.poster=x.poster;return o;});}
 function delFile(url){if(!url||url.startsWith('data:'))return;try{const fn=url.split('/uploads/').pop();if(fn){const fp=path.join(UPLOADS_DIR,fn);if(fs.existsSync(fp))fs.unlinkSync(fp);}}catch{}}
@@ -342,25 +351,29 @@ app.get('/api/posts/:id(\\d+)',(req,res)=>{
   res.json(publicPost(parsePost(row), isAdminReq(req)));
 });
 app.post('/api/posts',adminOnly,(req,res)=>{
-  const{tag,tagEmoji,text,media,replyTo}=req.body;
+  const{tag,tagEmoji,text,media,replyTo,links}=req.body;
   if(!tag)return res.status(400).json({error:'tag is required'});
   if(tooLong(tag,LIMITS.tag))return res.status(400).json({error:`tag too long (max ${LIMITS.tag} chars)`});
   if(tooLong(tagEmoji,LIMITS.tagEmoji))return res.status(400).json({error:'tagEmoji too long'});
   if(tooLong(text,LIMITS.text))return res.status(400).json({error:`text too long (max ${LIMITS.text} chars)`});
   let sRT=null;if(replyTo&&typeof replyTo==='object'){const rid=Number(replyTo.id);if(rid)sRT={id:rid,text:String(replyTo.text||'').slice(0,LIMITS.replyText),tag:String(replyTo.tag||'').slice(0,LIMITS.tag),tagEmoji:String(replyTo.tagEmoji||'').slice(0,LIMITS.tagEmoji)};}
   const now=new Date(),id=Date.now();
-  db.prepare("INSERT INTO posts(id,tag,tagEmoji,text,media,replyTo,reactions,reactUsers,pinned,time,date,createdAt) VALUES(?,?,?,?,?,?,'{}','{}',0,?,?,?)").run(id,tag,tagEmoji||'',text||'',JSON.stringify(cleanMedia(media)),sRT?JSON.stringify(sRT):null,now.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}),now.toLocaleDateString(),now.toISOString());
+  db.prepare("INSERT INTO posts(id,tag,tagEmoji,text,media,links,replyTo,reactions,reactUsers,pinned,time,date,createdAt) VALUES(?,?,?,?,?,?,?,'{}','{}',0,?,?,?)").run(id,tag,tagEmoji||'',text||'',JSON.stringify(cleanMedia(media)),JSON.stringify(cleanLinks(links,text||'')),sRT?JSON.stringify(sRT):null,now.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}),now.toLocaleDateString(),now.toISOString());
   broadcast({type:'new_post',id});const post=parsePost(db.prepare('SELECT * FROM posts WHERE id=?').get(id));const{reactUsers,...safe}=post;res.status(201).json(safe);
 });
 app.delete('/api/posts/:id',adminOnly,(req,res)=>{const id=Number(req.params.id),row=db.prepare('SELECT media FROM posts WHERE id=?').get(id);if(!row)return res.status(404).json({error:'Post not found'});try{JSON.parse(row.media||'[]').forEach(m=>{delFile(m.url);delFile(m.poster);});}catch{}db.prepare('DELETE FROM posts WHERE id=?').run(id);broadcast({type:'delete_post',id});res.json({ok:true});});
 app.patch('/api/posts/:id/edit',adminOnly,(req,res)=>{
   const id=Number(req.params.id);
   if(!db.prepare('SELECT id FROM posts WHERE id=?').get(id))return res.status(404).json({error:'Post not found'});
-  const{tag,tagEmoji,text}=req.body||{};
+  const{tag,tagEmoji,text,links}=req.body||{};
   if(tooLong(tag,LIMITS.tag))return res.status(400).json({error:`tag too long (max ${LIMITS.tag} chars)`});
   if(tooLong(tagEmoji,LIMITS.tagEmoji))return res.status(400).json({error:'tagEmoji too long'});
   if(tooLong(text,LIMITS.text))return res.status(400).json({error:`text too long (max ${LIMITS.text} chars)`});
-  db.prepare('UPDATE posts SET tag=COALESCE(?,tag),tagEmoji=COALESCE(?,tagEmoji),text=COALESCE(?,text),editedAt=? WHERE id=?').run(tag||null,tagEmoji!=null?tagEmoji:null,text!=null?text:null,new Date().toISOString(),id);
+  const cur=db.prepare('SELECT text,links FROM posts WHERE id=?').get(id);
+  const finalText=text!=null?String(text):cur.text;
+  // links sent -> validate against the new text; not sent -> keep only if the text did not change
+  const finalLinks=links!==undefined?cleanLinks(links,finalText):(finalText===cur.text?cleanLinks((()=>{try{return JSON.parse(cur.links||'[]');}catch{return[];}})(),finalText):[]);
+  db.prepare('UPDATE posts SET tag=COALESCE(?,tag),tagEmoji=COALESCE(?,tagEmoji),text=COALESCE(?,text),links=?,editedAt=? WHERE id=?').run(tag||null,tagEmoji!=null?tagEmoji:null,text!=null?text:null,JSON.stringify(finalLinks),new Date().toISOString(),id);
   broadcast({type:'update_post',id});res.json({ok:true});
 });
 app.patch('/api/posts/:id/pin',adminOnly,(req,res)=>{const id=Number(req.params.id),row=db.prepare('SELECT pinned FROM posts WHERE id=?').get(id);if(!row)return res.status(404).json({error:'Post not found'});const p=row.pinned?0:1;db.prepare('UPDATE posts SET pinned=? WHERE id=?').run(p,id);broadcast({type:'update_post',id});res.json({ok:true,pinned:!!p});});
