@@ -275,6 +275,8 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .tag-badge:hover { opacity: 0.75; }
 [data-theme="dark"] .tag-badge { color: #5DCAA5; }
 .card-body { padding: 9px 14px 11px; font-size: 14px; line-height: 1.68; color: var(--text); word-break: break-word; white-space: pre-wrap; }
+.card-body a.post-link { color: var(--green); text-decoration: underline; text-underline-offset: 2px; text-decoration-thickness: 1px; overflow-wrap: anywhere; word-break: break-word; }
+.card-body a.post-link:hover { text-decoration-thickness: 2px; }
 .tr-bar { font-size: 11px; color: var(--green-dark); background: var(--green-light); padding: 3px 10px; margin: 0 14px 8px; border-radius: 5px; display: flex; align-items: center; gap: 4px; }
 [data-theme="dark"] .tr-bar { color: #5DCAA5; }
 .media-wrap { background: var(--bg); position: relative; }
@@ -816,6 +818,100 @@ function saveBM()     { localStorage.setItem(BM_KEY, JSON.stringify(bookmarks));
 function saveReacts() { localStorage.setItem(REACTS_KEY, JSON.stringify(userReacts)); }
 
 /* ── PRIORITY 5: HTML escape to prevent XSS ── */
+/* ── POST LINKS: auto-detected URLs + manual inline links ──
+   A post stores plain `text` plus `links: [{start,end,url}]` (UTF-16 offsets into text).
+   Typed/pasted URLs are detected at render time, so they stay clickable after save/reload. */
+const QGLinks = (function () {
+  const TRAIL = '.,;:!?\'"”’»…';
+  function safeUrl(raw) {
+    if (typeof raw !== 'string') return null;
+    let u = raw.trim();
+    if (!u || u.length > 2000 || /[\s\u0000-\u001f\u007f<>"'`\\]/.test(u)) return null;
+    if (!/^[a-z][a-z0-9+.-]*:/i.test(u) && /^(www\.)?[a-z0-9-]+(\.[a-z0-9-]+)+([\/?#:]|$)/i.test(u)) u = 'https://' + u;
+    let p; try { p = new URL(u); } catch (e) { return null; }
+    if (p.protocol !== 'http:' && p.protocol !== 'https:') return null;   // never javascript:, data:, etc.
+    if (p.username || p.password) return null;                            // blocks https://google.com@evil.com tricks
+    if (!p.hostname.includes('.')) return null;
+    return p.href;
+  }
+  function esc(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+  }
+  function count(s, ch) { let n = 0; for (const c of s) if (c === ch) n++; return n; }
+  function trimTail(url) {
+    for (;;) {
+      const last = url.slice(-1);
+      if (!last) return url;
+      if (TRAIL.includes(last)) { url = url.slice(0, -1); continue; }
+      if (last === ')' && count(url, ')') > count(url, '(')) { url = url.slice(0, -1); continue; }
+      if (last === ']' && count(url, ']') > count(url, '[')) { url = url.slice(0, -1); continue; }
+      if (last === '}' && count(url, '}') > count(url, '{')) { url = url.slice(0, -1); continue; }
+      return url;
+    }
+  }
+  function normalize(links, len) {
+    if (!Array.isArray(links)) return [];
+    const out = [];
+    links.forEach(l => {
+      if (!l) return;
+      const s = Number(l.start), e = Number(l.end), url = safeUrl(l.url);
+      if (Number.isInteger(s) && Number.isInteger(e) && s >= 0 && e > s && e <= len && url) out.push({ start: s, end: e, url: url });
+    });
+    out.sort((a, b) => a.start - b.start);
+    const res = []; let last = 0;
+    out.forEach(l => { if (l.start >= last) { res.push(l); last = l.end; } });
+    return res;
+  }
+  function autoIn(text, a, b) {
+    const found = [], re = /(?:https?:\/\/|www\.)[^\s<>"'`]+/gi, seg = text.slice(a, b);
+    let m;
+    while ((m = re.exec(seg))) {
+      const idx = m.index;
+      if (idx > 0 && /[\w@\/.-]/.test(seg[idx - 1]) && a + idx > 0) { continue; }   // inside a word/path, not a standalone URL
+      const raw = trimTail(m[0]);
+      const url = safeUrl(raw);
+      if (url) found.push({ start: a + idx, end: a + idx + raw.length, url: url, auto: true });
+    }
+    return found;
+  }
+  /* Every link that will be rendered, in order (manual ones win; auto-detected fill the gaps). */
+  function spans(text, links) {
+    text = String(text || '');
+    const manual = normalize(links, text.length), all = [];
+    let pos = 0;
+    manual.forEach(l => { if (l.start > pos) all.push.apply(all, autoIn(text, pos, l.start)); all.push(l); pos = l.end; });
+    if (pos < text.length) all.push.apply(all, autoIn(text, pos, text.length));
+    return all;
+  }
+  function toHTML(text, links) {
+    text = String(text || '');
+    let html = '', pos = 0;
+    spans(text, links).forEach(l => {
+      html += esc(text.slice(pos, l.start));
+      html += '<a class="post-link" href="' + esc(l.url) + '" target="_blank" rel="noopener noreferrer">' + esc(text.slice(l.start, l.end)) + '</a>';
+      pos = l.end;
+    });
+    return html + esc(text.slice(pos));
+  }
+  /* Keep manual link positions correct while the text is edited (common prefix/suffix diff). */
+  function adjust(oldT, newT, links) {
+    if (oldT === newT || !links || !links.length) return links || [];
+    let p = 0; const max = Math.min(oldT.length, newT.length);
+    while (p < max && oldT.charCodeAt(p) === newT.charCodeAt(p)) p++;
+    let sfx = 0;
+    while (sfx < max - p && oldT.charCodeAt(oldT.length - 1 - sfx) === newT.charCodeAt(newT.length - 1 - sfx)) sfx++;
+    const oldEnd = oldT.length - sfx, delta = newT.length - oldT.length, out = [];
+    links.forEach(l => {
+      if (l.end <= p) out.push(l);                                                         // entirely before the edit
+      else if (l.start >= oldEnd) out.push({ start: l.start + delta, end: l.end + delta, url: l.url });   // entirely after
+      else if (l.start <= p && l.end >= oldEnd) { if (l.end + delta > l.start) out.push({ start: l.start, end: l.end + delta, url: l.url }); } // edit inside link text
+      /* otherwise the edit cut across the link's boundary — drop it */
+    });
+    return out;
+  }
+  return { safeUrl: safeUrl, toHTML: toHTML, spans: spans, normalize: normalize, adjust: adjust, esc: esc };
+})();
+
 function escapeHtml(str) {
   if (!str) return '';
   return String(str)
@@ -1263,7 +1359,7 @@ function createPostCardElement(post, body, didTranslate) {
       <button type="button" class="tag-badge" data-action="filter-tag" data-tag="${escapeHtml(post.tag)}">${escapeHtml(post.tagEmoji||'')} ${escapeHtml(post.tag)}</button>
     </div>
     ${replyHTML}
-    ${body ? `<div class="card-body">${escapeHtml(body)}</div>` : ''}
+    ${body ? `<div class="card-body">${QGLinks.toHTML(body, didTranslate ? [] : post.links)}</div>` : ''}
     ${didTranslate ? `<div class="tr-bar">${t('trFrom')}</div>` : ''}
     ${mediaHTML}
     <div class="react-row" role="group">
