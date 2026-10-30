@@ -78,6 +78,21 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .pcard.fs-hide { display: none; }
 mark.fs-hit { background: color-mix(in srgb, var(--amber) 45%, transparent); color: inherit; border-radius: 3px; padding: 0 1px; }
 
+.tx-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: -2px; }
+.tx-row .char-count { margin: 0; }
+.link-btn { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--border2); background: var(--surface2); color: var(--text2); font: 500 12px 'DM Sans', sans-serif; cursor: pointer; }
+.link-btn:hover { border-color: var(--green); color: var(--green); }
+.link-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.link-chips:empty { display: none; }
+.link-chip { display: inline-flex; align-items: center; max-width: 100%; border: 1px solid var(--border2); background: var(--surface2); border-radius: 999px; font-size: 12px; color: var(--text2); overflow: hidden; }
+.link-chip button { border: 0; background: none; color: inherit; font: inherit; cursor: pointer; }
+.link-chip .lc-main { padding: 4px 4px 4px 10px; max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.link-chip .lc-main:hover { color: var(--green); }
+.link-chip .lc-x { padding: 4px 9px 4px 4px; font-size: 15px; line-height: 1; }
+.link-chip .lc-x:hover { color: var(--red); }
+.pbody a.post-link { color: var(--green); text-decoration: underline; text-underline-offset: 2px; overflow-wrap: anywhere; }
+#linkErr { min-height: 16px; margin-top: 8px; font-size: 12px; color: var(--red); }
+
 /* LAYOUT */
 .layout { display: grid; grid-template-columns: 1fr 350px; max-width: 1160px; margin: 0 auto; padding: 22px 18px; gap: 20px; }
 
@@ -240,6 +255,26 @@ mark.fs-hit { background: color-mix(in srgb, var(--amber) 45%, transparent); col
 <body>
 
 <!-- SERVER SETUP MODAL -->
+<div class="modal-overlay" id="linkModal" style="display:none" role="dialog" aria-modal="true" aria-labelledby="linkModalTitle">
+  <div class="modal-box">
+    <h3 id="linkModalTitle">🔗 Add link</h3>
+    <p>The link is attached to this exact text inside the post.</p>
+    <div class="fgrp" style="margin-bottom:12px">
+      <label for="linkName">Link name</label>
+      <input class="finput" id="linkName" type="text" placeholder="Text that will be clickable" autocomplete="off" maxlength="300">
+    </div>
+    <div class="fgrp">
+      <label for="linkUrl">URL</label>
+      <input class="finput" id="linkUrl" type="url" inputmode="url" placeholder="https://" autocomplete="off" autocapitalize="off" spellcheck="false">
+    </div>
+    <div id="linkErr" role="alert"></div>
+    <div class="modal-actions">
+      <button type="button" class="btn-secondary" onclick="closeLinkModal()">Cancel</button>
+      <button type="button" class="btn-primary" id="linkSave" onclick="saveLinkModal()">Add link</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="serverModal" style="display:none">
   <div class="modal-box">
     <h3>🔌 Server Connection</h3>
@@ -324,7 +359,11 @@ mark.fs-hit { background: color-mix(in srgb, var(--amber) 45%, transparent); col
           <div class="fgrp">
             <label for="postText">Message</label>
             <textarea class="ftextarea" id="postText" placeholder="Write your news update here…" maxlength="2000" oninput="updateCharCount()"></textarea>
-            <div class="char-count" id="charCount">0 / 2000</div>
+            <div class="tx-row">
+              <button type="button" class="link-btn" id="linkBtn" onmousedown="event.preventDefault()" onclick="openLinkModal()" title="Select text, then add a link to it">🔗 Link</button>
+              <div class="char-count" id="charCount">0 / 2000</div>
+            </div>
+            <div class="link-chips" id="linkChips" aria-label="Links in this post"></div>
           </div>
 
           <!-- Image / Video tab -->
@@ -582,9 +621,189 @@ function showPanel(p) {
 }
 
 /* ── CHAR COUNT ── */
+/* ── POST LINKS: auto-detected URLs + manual inline links ──
+   A post stores plain `text` plus `links: [{start,end,url}]` (UTF-16 offsets into text).
+   Typed/pasted URLs are detected at render time, so they stay clickable after save/reload. */
+const QGLinks = (function () {
+  const TRAIL = '.,;:!?\'"”’»…';
+  function safeUrl(raw) {
+    if (typeof raw !== 'string') return null;
+    let u = raw.trim();
+    if (!u || u.length > 2000 || /[\s\u0000-\u001f\u007f<>"'`\\]/.test(u)) return null;
+    if (!/^[a-z][a-z0-9+.-]*:/i.test(u) && /^(www\.)?[a-z0-9-]+(\.[a-z0-9-]+)+([\/?#:]|$)/i.test(u)) u = 'https://' + u;
+    let p; try { p = new URL(u); } catch (e) { return null; }
+    if (p.protocol !== 'http:' && p.protocol !== 'https:') return null;   // never javascript:, data:, etc.
+    if (p.username || p.password) return null;                            // blocks https://google.com@evil.com tricks
+    if (!p.hostname.includes('.')) return null;
+    return p.href;
+  }
+  function esc(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+  }
+  function count(s, ch) { let n = 0; for (const c of s) if (c === ch) n++; return n; }
+  function trimTail(url) {
+    for (;;) {
+      const last = url.slice(-1);
+      if (!last) return url;
+      if (TRAIL.includes(last)) { url = url.slice(0, -1); continue; }
+      if (last === ')' && count(url, ')') > count(url, '(')) { url = url.slice(0, -1); continue; }
+      if (last === ']' && count(url, ']') > count(url, '[')) { url = url.slice(0, -1); continue; }
+      if (last === '}' && count(url, '}') > count(url, '{')) { url = url.slice(0, -1); continue; }
+      return url;
+    }
+  }
+  function normalize(links, len) {
+    if (!Array.isArray(links)) return [];
+    const out = [];
+    links.forEach(l => {
+      if (!l) return;
+      const s = Number(l.start), e = Number(l.end), url = safeUrl(l.url);
+      if (Number.isInteger(s) && Number.isInteger(e) && s >= 0 && e > s && e <= len && url) out.push({ start: s, end: e, url: url });
+    });
+    out.sort((a, b) => a.start - b.start);
+    const res = []; let last = 0;
+    out.forEach(l => { if (l.start >= last) { res.push(l); last = l.end; } });
+    return res;
+  }
+  function autoIn(text, a, b) {
+    const found = [], re = /(?:https?:\/\/|www\.)[^\s<>"'`]+/gi, seg = text.slice(a, b);
+    let m;
+    while ((m = re.exec(seg))) {
+      const idx = m.index;
+      if (idx > 0 && /[\w@\/.-]/.test(seg[idx - 1]) && a + idx > 0) { continue; }   // inside a word/path, not a standalone URL
+      const raw = trimTail(m[0]);
+      const url = safeUrl(raw);
+      if (url) found.push({ start: a + idx, end: a + idx + raw.length, url: url, auto: true });
+    }
+    return found;
+  }
+  /* Every link that will be rendered, in order (manual ones win; auto-detected fill the gaps). */
+  function spans(text, links) {
+    text = String(text || '');
+    const manual = normalize(links, text.length), all = [];
+    let pos = 0;
+    manual.forEach(l => { if (l.start > pos) all.push.apply(all, autoIn(text, pos, l.start)); all.push(l); pos = l.end; });
+    if (pos < text.length) all.push.apply(all, autoIn(text, pos, text.length));
+    return all;
+  }
+  function toHTML(text, links) {
+    text = String(text || '');
+    let html = '', pos = 0;
+    spans(text, links).forEach(l => {
+      html += esc(text.slice(pos, l.start));
+      html += '<a class="post-link" href="' + esc(l.url) + '" target="_blank" rel="noopener noreferrer">' + esc(text.slice(l.start, l.end)) + '</a>';
+      pos = l.end;
+    });
+    return html + esc(text.slice(pos));
+  }
+  /* Keep manual link positions correct while the text is edited (common prefix/suffix diff). */
+  function adjust(oldT, newT, links) {
+    if (oldT === newT || !links || !links.length) return links || [];
+    let p = 0; const max = Math.min(oldT.length, newT.length);
+    while (p < max && oldT.charCodeAt(p) === newT.charCodeAt(p)) p++;
+    let sfx = 0;
+    while (sfx < max - p && oldT.charCodeAt(oldT.length - 1 - sfx) === newT.charCodeAt(newT.length - 1 - sfx)) sfx++;
+    const oldEnd = oldT.length - sfx, delta = newT.length - oldT.length, out = [];
+    links.forEach(l => {
+      if (l.end <= p) out.push(l);                                                         // entirely before the edit
+      else if (l.start >= oldEnd) out.push({ start: l.start + delta, end: l.end + delta, url: l.url });   // entirely after
+      else if (l.start <= p && l.end >= oldEnd) { if (l.end + delta > l.start) out.push({ start: l.start, end: l.end + delta, url: l.url }); } // edit inside link text
+      /* otherwise the edit cut across the link's boundary — drop it */
+    });
+    return out;
+  }
+  return { safeUrl: safeUrl, toHTML: toHTML, spans: spans, normalize: normalize, adjust: adjust, esc: esc };
+})();
+
+/* ── LINK EDITOR STATE ── */
+let _postLinks = [];        // [{start,end,url}] for the text currently in #postText
+let _lastPostText = '';
+let _linkSel = { s: 0, e: 0 };
+let _linkEditing = null;    // link being edited in the modal (or null when adding)
+
+function _taSel() {
+  const ta = document.getElementById('postText');
+  return { s: ta.selectionStart, e: ta.selectionEnd };
+}
+(function () {
+  const ta = document.getElementById('postText');
+  ['select', 'keyup', 'mouseup', 'touchend', 'blur', 'input'].forEach(ev => ta.addEventListener(ev, () => { _linkSel = _taSel(); }));
+})();
+function setComposerLinks(text, links) {
+  _lastPostText = text || '';
+  _postLinks = QGLinks.normalize(links || [], _lastPostText.length).map(l => ({ start: l.start, end: l.end, url: l.url }));
+  renderLinkChips();
+}
+function renderLinkChips() {
+  const box = document.getElementById('linkChips'); if (!box) return;
+  const text = document.getElementById('postText').value;
+  box.innerHTML = '';
+  _postLinks.forEach((l, i) => {
+    let host = ''; try { host = new URL(l.url).hostname.replace(/^www\./, ''); } catch (e) {}
+    const chip = document.createElement('span'); chip.className = 'link-chip';
+    const main = document.createElement('button'); main.type = 'button'; main.className = 'lc-main';
+    main.textContent = '🔗 ' + text.slice(l.start, l.end) + (host ? ' → ' + host : '');
+    main.title = 'Edit link: ' + l.url; main.onclick = () => openLinkModal(i);
+    const x = document.createElement('button'); x.type = 'button'; x.className = 'lc-x'; x.textContent = '×';
+    x.setAttribute('aria-label', 'Remove link'); x.title = 'Remove link (keeps the text)';
+    x.onclick = () => { _postLinks.splice(i, 1); renderLinkChips(); };
+    chip.append(main, x); box.appendChild(chip);
+  });
+}
+function openLinkModal(idx) {
+  const ta = document.getElementById('postText');
+  let s, e, existing = null;
+  if (typeof idx === 'number' && _postLinks[idx]) { existing = _postLinks[idx]; s = existing.start; e = existing.end; }
+  else {
+    const sel = (document.activeElement === ta) ? _taSel() : (ta.selectionStart != null ? _taSel() : _linkSel);
+    s = sel.s; e = sel.e;
+    // trim whitespace out of the selection so the link hugs the words
+    while (s < e && /\s/.test(ta.value[s])) s++;
+    while (e > s && /\s/.test(ta.value[e - 1])) e--;
+    existing = _postLinks.find(l => (s === e ? (s >= l.start && s <= l.end) : (s < l.end && e > l.start))) || null;
+    if (existing && s === e) { s = existing.start; e = existing.end; }
+  }
+  _linkEditing = existing; _linkSel = { s, e };
+  const name = ta.value.slice(s, e);
+  document.getElementById('linkName').value = name;
+  document.getElementById('linkUrl').value = existing ? existing.url : (QGLinks.safeUrl(name) ? name : '');
+  document.getElementById('linkErr').textContent = '';
+  document.getElementById('linkModalTitle').textContent = existing ? '🔗 Edit link' : '🔗 Add link';
+  document.getElementById('linkSave').textContent = existing ? 'Update link' : 'Add link';
+  document.getElementById('linkModal').style.display = 'flex';
+  setTimeout(() => document.getElementById(name ? 'linkUrl' : 'linkName').focus(), 30);
+}
+function closeLinkModal() { document.getElementById('linkModal').style.display = 'none'; _linkEditing = null; }
+function saveLinkModal() {
+  const ta = document.getElementById('postText'), err = document.getElementById('linkErr');
+  const name = document.getElementById('linkName').value.replace(/\s+/g, ' ').trim();
+  const url = QGLinks.safeUrl(document.getElementById('linkUrl').value);
+  if (!name) { err.textContent = 'Enter the link name (the clickable text).'; return; }
+  if (!url)  { err.textContent = 'Enter a valid web address starting with http:// or https://'; return; }
+  const old = ta.value; let { s, e } = _linkSel;
+  s = Math.min(s, old.length); e = Math.min(Math.max(e, s), old.length);
+  const next = old.slice(0, s) + name + old.slice(e);
+  if (next.length > ta.maxLength) { err.textContent = 'Not enough room left in the post for this text.'; return; }
+  // drop any link that overlaps the replaced range, then keep the rest aligned with the new text
+  let keep = _postLinks.filter(l => l.end <= s || l.start >= e);
+  keep = QGLinks.adjust(old, next, keep);
+  keep.push({ start: s, end: s + name.length, url });
+  keep.sort((a, b) => a.start - b.start);
+  ta.value = next;
+  _lastPostText = next; _postLinks = keep;
+  updateCharCount(); renderLinkChips(); closeLinkModal();
+  ta.focus(); ta.setSelectionRange(s + name.length, s + name.length);
+}
+document.getElementById('linkModal').addEventListener('keydown', ev => {
+  if (ev.key === 'Escape') closeLinkModal();
+  else if (ev.key === 'Enter' && ev.target.tagName === 'INPUT') { ev.preventDefault(); saveLinkModal(); }
+});
+document.getElementById('linkModal').addEventListener('mousedown', ev => { if (ev.target.id === 'linkModal') closeLinkModal(); });
+
 function updateCharCount() {
   const ta = document.getElementById('postText');
   const cc = document.getElementById('charCount');
+  if (ta.value !== _lastPostText) { _postLinks = QGLinks.adjust(_lastPostText, ta.value, _postLinks); _lastPostText = ta.value; renderLinkChips(); }
   const len = ta.value.length;
   cc.textContent = `${len} / 2000`;
   cc.className = 'char-count' + (len > 1800 ? (len >= 2000 ? ' over' : ' warn') : '');
@@ -827,6 +1046,7 @@ function startEdit(postId) {
 
   // Populate form
   document.getElementById('postText').value = post.text || '';
+  setComposerLinks(post.text || '', post.links);
   updateCharCount();
 
   // Set category
@@ -849,6 +1069,7 @@ function cancelEdit() {
   document.getElementById('editBar').style.display = 'none';
   document.getElementById('pubBtn').textContent = 'Publish Post →';
   document.getElementById('postText').value = '';
+  setComposerLinks('', []);
   updateCharCount();
 }
 
@@ -858,7 +1079,10 @@ let _cachedPosts = [];  // keep a local copy for edit/reply lookups
 async function publishPost() {
   if (!API.isOk()) { showToast('Not connected to server', 'err'); return; }
 
-  const text   = document.getElementById('postText').value.trim();
+  const rawText = document.getElementById('postText').value;
+  const text    = rawText.trim();
+  const lead    = rawText.length - rawText.trimStart().length;      // keep link offsets aligned after trimming
+  const links   = QGLinks.normalize(_postLinks.map(l => ({ start: l.start - lead, end: l.end - lead, url: l.url })), text.length);
   const tagVal = document.getElementById('catSelect').value;
   const cats   = await fetchCatsAPI();
   const cat    = cats.find(c => c.name === tagVal) || { emoji: '📌', name: tagVal || 'Update' };
@@ -889,12 +1113,12 @@ async function publishPost() {
   try {
     if (_editingPostId) {
       // EDIT MODE: patch existing post
-      await API.patch(`/api/posts/${_editingPostId}/edit`, { tag: cat.name, tagEmoji: cat.emoji, text });
+      await API.patch(`/api/posts/${_editingPostId}/edit`, { tag: cat.name, tagEmoji: cat.emoji, text, links });
       cancelEdit();
       showToast('✓ Post updated!');
     } else {
       // NEW POST (with optional replyTo)
-      const payload = { tag: cat.name, tagEmoji: cat.emoji, text, media };
+      const payload = { tag: cat.name, tagEmoji: cat.emoji, text, links, media };
       if (_replyTo) payload.replyTo = _replyTo;
       await API.post('/api/posts', payload, true);
       cancelReply();
@@ -902,6 +1126,7 @@ async function publishPost() {
     }
 
     document.getElementById('postText').value = '';
+    setComposerLinks('', []);
     updateCharCount();
     prevGrid.innerHTML = '';
     uploadedFiles = []; selectedGif = null;
@@ -1023,7 +1248,7 @@ function createAdminPostCardElement(post) {
       <span class="ptag">${escapeHtml(post.tagEmoji||'')} ${escapeHtml(post.tag)}</span>
       <span class="ptime">${escapeHtml(post.date)} · ${escapeHtml(post.time)}</span>
     </div>
-    ${post.text ? `<div class="pbody">${escapeHtml(post.text)}</div>` : ''}
+    ${post.text ? `<div class="pbody">${QGLinks.toHTML(post.text, post.links)}</div>` : ''}
     ${mediaHTML}
     ${rxnHTML ? `<div class="preacts">${rxnHTML}</div>` : ''}
     <div class="pactions">
