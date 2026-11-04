@@ -528,13 +528,6 @@ footer span { font-size: 12px; color: var(--text3); }
   <!-- SCROLLABLE FEED -->
   <main class="feed-col" id="feedCol">
     <div class="feed-inner">
-      <!-- Top banner — 728x90 on desktop, 468x60 on mobile (populated by JS) -->
-      <div class="top-banner-wrap">
-        <div class="ad-label">Advertisement</div>
-        <div id="adTopDesktop" class="top-banner-slot desktop-only"></div>
-        <div id="adTopMobile" class="top-banner-slot mobile-only"></div>
-      </div>
-
       <div class="feed-hdr">
         <div>
           <h1 id="lblLatest">Latest Updates</h1>
@@ -2122,21 +2115,6 @@ async function scrollToLinkedPost() {
 // Show skeleton cards immediately while posts load
 showSkeletons(3);
 
-/* ── Populate static Banner ad slots (sidebar + top) — each isolated in its own sandboxed iframe ── */
-function populateAdsterraSlots() {
-  // Top-of-feed banners (one per breakpoint). Side columns are handled by fillSideColumns().
-  const slots = [
-    { id: 'adTopDesktop',  key: ADSTERRA_KEYS.w728h90,  w: 728, h: 90  },
-    { id: 'adTopMobile',   key: ADSTERRA_KEYS.w468h60,  w: 468, h: 60  },
-  ];
-  slots.forEach(slot => {
-    const el = document.getElementById(slot.id);
-    if (!el) return;
-    if (!el.offsetParent) return; // slot is hidden by CSS (wrong breakpoint) — don't load an ad nobody can see
-    el.appendChild(createAdsterraBannerIframe(slot.key, slot.w, slot.h));
-  });
-}
-populateAdsterraSlots();
 
 /* ── SIDE COLUMNS: stack ads down the ENTIRE height of the left and right columns ──
    Layout per column: 160x600 banners back to back; if the leftover space is big enough, a final 160x300.
