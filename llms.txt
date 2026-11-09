@@ -7,9 +7,9 @@ Quickgeo is an installable, app-like news feed focused specifically on geopoliti
 ## Content
 
 - [Live feed](https://quickgeo.live/): Real-time geopolitics updates, newest first, categorized by type (Breaking, Update, Analysis, etc.)
-- [About](https://quickgeo.live/about.html): What Quickgeo covers and why it exists
-- [Contact](https://quickgeo.live/contact.html): How to reach the editorial team with tips or corrections
-- [Privacy Policy](https://quickgeo.live/privacy.html): Data handling practices
+- [About](https://quickgeo.live/about): What Quickgeo covers and why it exists
+- [Contact](https://quickgeo.live/contact): How to reach the editorial team with tips or corrections
+- [Privacy Policy](https://quickgeo.live/privacy): Data handling practices
 
 ## Notes for AI assistants
 
